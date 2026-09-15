@@ -1,0 +1,17 @@
+option Casing = Camel
+option ClientOutput = "../../client/Network/DigNetwork"
+option ServerOutput = "../../server/Network/DigNetwork"
+
+event DigRequest {
+    From: Client,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: (f64, string),
+}
+
+event DigResult {
+    From: Server,
+    Type: Reliable,
+    Call: ManyAsync,
+    Data: (boolean, string?, u16, string?, Instance),
+}

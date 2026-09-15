@@ -3,6 +3,11 @@
 registry = "test"
 
 [[package]]
+name = "devlsayed/blink"
+version = "0.18.6"
+dependencies = []
+
+[[package]]
 name = "evaera/promise"
 version = "4.0.0"
 dependencies = []
@@ -115,7 +120,7 @@ dependencies = []
 [[package]]
 name = "reskyadhyaksa/untitled-project"
 version = "0.1.0"
-dependencies = [["Promise", "evaera/promise@4.0.0"], ["React", "jsdotlua/react@17.2.1"], ["ReactReflex", "littensy/react-reflex@0.3.6"], ["ReactRoblox", "jsdotlua/react-roblox@17.2.1"], ["Reflex", "littensy/reflex@4.3.1"], ["Signal", "sleitnick/signal@2.0.3"], ["Spring", "sleitnick/spring@1.0.0"], ["Trove", "sleitnick/trove@1.8.0"], ["ZonePlus", "mattschrubb/zoneplus@3.2.0"], ["ProfileService", "firebird702/profileservice@1.1.0"]]
+dependencies = [["Blink", "devlsayed/blink@0.18.6"], ["Promise", "evaera/promise@4.0.0"], ["React", "jsdotlua/react@17.2.1"], ["ReactReflex", "littensy/react-reflex@0.3.6"], ["ReactRoblox", "jsdotlua/react-roblox@17.2.1"], ["Reflex", "littensy/reflex@4.3.1"], ["Signal", "sleitnick/signal@2.0.3"], ["Spring", "sleitnick/spring@1.0.0"], ["Trove", "sleitnick/trove@1.8.0"], ["ZonePlus", "mattschrubb/zoneplus@3.2.0"], ["ProfileService", "firebird702/profileservice@1.1.0"]]
 
 [[package]]
 name = "sleitnick/signal"
