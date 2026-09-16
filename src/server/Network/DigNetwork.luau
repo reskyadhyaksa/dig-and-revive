@@ -159,7 +159,8 @@ local Queue: any = {
 local SerdesEvent = "?"
 local SerdesThread: thread?
 Queue.Reliable[0] = table.create(256)
-local function ReadEVENT_DigRequest(): (number, string)
+Queue.Reliable[2] = table.create(256)
+local function ReadEVENT_StartDigRequest(): (number, string)
 	-- Read BLOCK: 10 bytes
 	local BLOCK_START = Read(10)
 	local Value1 = buffer.readf64(RecieveBuffer, BLOCK_START + 0)
@@ -168,10 +169,34 @@ local function ReadEVENT_DigRequest(): (number, string)
 	return Value1, Value2
 end
 
-local function WriteEVENT_DigResult(Value1: boolean, Value2: string?, Value3: number, Value4: string?, Value5: Instance): ()
-	-- Allocate BLOCK: 6 bytes
-	local BLOCK_START = Allocate(6)
+local function WriteEVENT_StartMinigame(Value1: string, Value2: number, Value3: number): ()
+	-- Allocate BLOCK: 13 bytes
+	local BLOCK_START = Allocate(13)
 	buffer.writeu8(SendBuffer, BLOCK_START + 0, 1)
+	local Length = #Value1
+	buffer.writeu16(SendBuffer, BLOCK_START + 1, Length)
+	Allocate(Length)
+	buffer.writestring(SendBuffer, SendOffset, Value1, Length)
+	buffer.writeu16(SendBuffer, BLOCK_START + 3, Value2)
+	buffer.writef64(SendBuffer, BLOCK_START + 5, Value3)
+end
+
+local function ReadEVENT_SwingRequest(): (nil)
+	return Value
+end
+
+local function WriteEVENT_MinigameHit(Value1: number, Value2: number): ()
+	-- Allocate BLOCK: 5 bytes
+	local BLOCK_START = Allocate(5)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 3)
+	buffer.writeu16(SendBuffer, BLOCK_START + 1, Value1)
+	buffer.writeu16(SendBuffer, BLOCK_START + 3, Value2)
+end
+
+local function WriteEVENT_MinigameComplete(Value1: boolean, Value2: string?, Value3: number, Value4: number, Value5: number, Value6: number, Value7: string?): ()
+	-- Allocate BLOCK: 18 bytes
+	local BLOCK_START = Allocate(18)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 4)
 	buffer.writeu8(SendBuffer, BLOCK_START + 1, Value1 and 1 or 0)
 	buffer.writeu8(SendBuffer, BLOCK_START + 2, Value2 ~= nil and 1 or 0)
 	if Value2 ~= nil then
@@ -183,25 +208,76 @@ local function WriteEVENT_DigResult(Value1: boolean, Value2: string?, Value3: nu
 		buffer.writestring(SendBuffer, SendOffset, Value2, Length)
 	end
 	buffer.writeu16(SendBuffer, BLOCK_START + 3, Value3)
-	buffer.writeu8(SendBuffer, BLOCK_START + 5, Value4 ~= nil and 1 or 0)
-	if Value4 ~= nil then
+	buffer.writeu32(SendBuffer, BLOCK_START + 5, Value4)
+	buffer.writeu32(SendBuffer, BLOCK_START + 9, Value5)
+	buffer.writeu32(SendBuffer, BLOCK_START + 13, Value6)
+	buffer.writeu8(SendBuffer, BLOCK_START + 17, Value7 ~= nil and 1 or 0)
+	if Value7 ~= nil then
 		-- Allocate BLOCK: 2 bytes
 		local BLOCK_START = Allocate(2)
-		local Length = #Value4
+		local Length = #Value7
 		buffer.writeu16(SendBuffer, BLOCK_START + 0, Length)
 		Allocate(Length)
-		buffer.writestring(SendBuffer, SendOffset, Value4, Length)
+		buffer.writestring(SendBuffer, SendOffset, Value7, Length)
 	end
-	table.insert(SendInstances, Value5 or Null)
+end
+
+local function WriteEVENT_DigDropVFX(Value1: Instance, Value2: string): ()
+	-- Allocate BLOCK: 3 bytes
+	local BLOCK_START = Allocate(3)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 5)
+	table.insert(SendInstances, Value1 or Null)
+	local Length = #Value2
+	buffer.writeu16(SendBuffer, BLOCK_START + 1, Length)
+	Allocate(Length)
+	buffer.writestring(SendBuffer, SendOffset, Value2, Length)
+end
+
+local function WriteEVENT_PlayerStatsSync(Value1: number, Value2: number, Value3: number, Value4: number, Value5: number): ()
+	-- Allocate BLOCK: 25 bytes
+	local BLOCK_START = Allocate(25)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 6)
+	buffer.writeu32(SendBuffer, BLOCK_START + 1, Value1)
+	buffer.writeu32(SendBuffer, BLOCK_START + 5, Value2)
+	buffer.writeu32(SendBuffer, BLOCK_START + 9, Value3)
+	buffer.writeu32(SendBuffer, BLOCK_START + 13, Value4)
+	buffer.writef64(SendBuffer, BLOCK_START + 17, Value5)
 end
 
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
-	DigRequest = {
+	StartDigRequest = {
 		on = NOOP
 	},
-	DigResult = {
+	StartMinigame = {
+		fire = NOOP,
+		fireAll = NOOP,
+		fireList = NOOP,
+		fireExcept = NOOP
+	},
+	SwingRequest = {
+		on = NOOP
+	},
+	MinigameHit = {
+		fire = NOOP,
+		fireAll = NOOP,
+		fireList = NOOP,
+		fireExcept = NOOP
+	},
+	MinigameComplete = {
+		fire = NOOP,
+		fireAll = NOOP,
+		fireList = NOOP,
+		fireExcept = NOOP
+	},
+	DigDropVFX = {
+		fire = NOOP,
+		fireAll = NOOP,
+		fireList = NOOP,
+		fireExcept = NOOP
+	},
+	PlayerStatsSync = {
 		fire = NOOP,
 		fireAll = NOOP,
 		fireList = NOOP,
@@ -270,14 +346,24 @@ Reliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instance
 		local BLOCK_START = Read(1)
 		local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
 		if Index == 0 then
-			local Value1: number, Value2: string = ReadEVENT_DigRequest()
+			local Value1: number, Value2: string = ReadEVENT_StartDigRequest()
 			if Events.Reliable[0] ~= nil then
 				task.spawn(Events.Reliable[0], Player, Value1, Value2)
 			else
 				if #Queue.Reliable[0] > 256 then
-					warn("[Blink]: Event queue of \"DigRequest\" exceeded 256, did you forget to implement a listener?")
+					warn("[Blink]: Event queue of \"StartDigRequest\" exceeded 256, did you forget to implement a listener?")
 				end
 				table.insert(Queue.Reliable[0], {Player, Value1, Value2} :: {any})
+			end
+		elseif Index == 2 then
+			local Value: nil = ReadEVENT_SwingRequest()
+			if Events.Reliable[2] ~= nil then
+				task.spawn(Events.Reliable[2], Player, Value)
+			else
+				if #Queue.Reliable[2] > 256 then
+					warn("[Blink]: Event queue of \"SwingRequest\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[2], {Player, Value} :: {any})
 			end
 		end
 	end
@@ -304,7 +390,7 @@ end)
 local Returns = table.freeze({
 	stepReplication = StepReplication,
 
-	DigRequest = {
+	StartDigRequest = {
 		on = function(Listener: (Player: Player, Value1: number, Value2: string) -> ()): () -> ()
 			Events.Reliable[0] = Listener
 			for Index, Arguments in Queue.Reliable[0] do
@@ -318,15 +404,15 @@ local Returns = table.freeze({
 			end
 		end
 	},
-	DigResult = {
-		fire = function(Player: Player, Value1: boolean, Value2: string?, Value3: number, Value4: string?, Value5: Instance): ()
+	StartMinigame = {
+		fire = function(Player: Player, Value1: string, Value2: number, Value3: number): ()
 			Load(PlayersMap[Player])
-			WriteEVENT_DigResult(Value1, Value2, Value3, Value4, Value5)
+			WriteEVENT_StartMinigame(Value1, Value2, Value3)
 			PlayersMap[Player] = Save()
 		end,
-		fireAll = function(Value1: boolean, Value2: string?, Value3: number, Value4: string?, Value5: Instance): ()
+		fireAll = function(Value1: string, Value2: number, Value3: number): ()
 			Load()
-			WriteEVENT_DigResult(Value1, Value2, Value3, Value4, Value5)
+			WriteEVENT_StartMinigame(Value1, Value2, Value3)
 			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
 			for _, Player in Players:GetPlayers() do
 				Load(PlayersMap[Player])
@@ -336,9 +422,9 @@ local Returns = table.freeze({
 				PlayersMap[Player] = Save()
 			end
 		end,
-		fireList = function(List: {Player}, Value1: boolean, Value2: string?, Value3: number, Value4: string?, Value5: Instance): ()
+		fireList = function(List: {Player}, Value1: string, Value2: number, Value3: number): ()
 			Load()
-			WriteEVENT_DigResult(Value1, Value2, Value3, Value4, Value5)
+			WriteEVENT_StartMinigame(Value1, Value2, Value3)
 			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
 			for _, Player in List do
 				Load(PlayersMap[Player])
@@ -348,9 +434,207 @@ local Returns = table.freeze({
 				PlayersMap[Player] = Save()
 			end
 		end,
-		fireExcept = function(Except: Player, Value1: boolean, Value2: string?, Value3: number, Value4: string?, Value5: Instance): ()
+		fireExcept = function(Except: Player, Value1: string, Value2: number, Value3: number): ()
 			Load()
-			WriteEVENT_DigResult(Value1, Value2, Value3, Value4, Value5)
+			WriteEVENT_StartMinigame(Value1, Value2, Value3)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+	},
+	SwingRequest = {
+		on = function(Listener: (Player: Player, Value: nil) -> ()): () -> ()
+			Events.Reliable[2] = Listener
+			for Index, Arguments in Queue.Reliable[2] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[2] = {}
+			return function (): ()
+				if Events.Reliable[2] == Listener then
+					Events.Reliable[2] = nil
+				end
+			end
+		end
+	},
+	MinigameHit = {
+		fire = function(Player: Player, Value1: number, Value2: number): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_MinigameHit(Value1, Value2)
+			PlayersMap[Player] = Save()
+		end,
+		fireAll = function(Value1: number, Value2: number): ()
+			Load()
+			WriteEVENT_MinigameHit(Value1, Value2)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireList = function(List: {Player}, Value1: number, Value2: number): ()
+			Load()
+			WriteEVENT_MinigameHit(Value1, Value2)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireExcept = function(Except: Player, Value1: number, Value2: number): ()
+			Load()
+			WriteEVENT_MinigameHit(Value1, Value2)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+	},
+	MinigameComplete = {
+		fire = function(Player: Player, Value1: boolean, Value2: string?, Value3: number, Value4: number, Value5: number, Value6: number, Value7: string?): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_MinigameComplete(Value1, Value2, Value3, Value4, Value5, Value6, Value7)
+			PlayersMap[Player] = Save()
+		end,
+		fireAll = function(Value1: boolean, Value2: string?, Value3: number, Value4: number, Value5: number, Value6: number, Value7: string?): ()
+			Load()
+			WriteEVENT_MinigameComplete(Value1, Value2, Value3, Value4, Value5, Value6, Value7)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireList = function(List: {Player}, Value1: boolean, Value2: string?, Value3: number, Value4: number, Value5: number, Value6: number, Value7: string?): ()
+			Load()
+			WriteEVENT_MinigameComplete(Value1, Value2, Value3, Value4, Value5, Value6, Value7)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireExcept = function(Except: Player, Value1: boolean, Value2: string?, Value3: number, Value4: number, Value5: number, Value6: number, Value7: string?): ()
+			Load()
+			WriteEVENT_MinigameComplete(Value1, Value2, Value3, Value4, Value5, Value6, Value7)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+	},
+	DigDropVFX = {
+		fire = function(Player: Player, Value1: Instance, Value2: string): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_DigDropVFX(Value1, Value2)
+			PlayersMap[Player] = Save()
+		end,
+		fireAll = function(Value1: Instance, Value2: string): ()
+			Load()
+			WriteEVENT_DigDropVFX(Value1, Value2)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireList = function(List: {Player}, Value1: Instance, Value2: string): ()
+			Load()
+			WriteEVENT_DigDropVFX(Value1, Value2)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireExcept = function(Except: Player, Value1: Instance, Value2: string): ()
+			Load()
+			WriteEVENT_DigDropVFX(Value1, Value2)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+	},
+	PlayerStatsSync = {
+		fire = function(Player: Player, Value1: number, Value2: number, Value3: number, Value4: number, Value5: number): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_PlayerStatsSync(Value1, Value2, Value3, Value4, Value5)
+			PlayersMap[Player] = Save()
+		end,
+		fireAll = function(Value1: number, Value2: number, Value3: number, Value4: number, Value5: number): ()
+			Load()
+			WriteEVENT_PlayerStatsSync(Value1, Value2, Value3, Value4, Value5)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireList = function(List: {Player}, Value1: number, Value2: number, Value3: number, Value4: number, Value5: number): ()
+			Load()
+			WriteEVENT_PlayerStatsSync(Value1, Value2, Value3, Value4, Value5)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireExcept = function(Except: Player, Value1: number, Value2: number, Value3: number, Value4: number, Value5: number): ()
+			Load()
+			WriteEVENT_PlayerStatsSync(Value1, Value2, Value3, Value4, Value5)
 			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
 			for _, Player in Players:GetPlayers() do
 				if Player == Except then

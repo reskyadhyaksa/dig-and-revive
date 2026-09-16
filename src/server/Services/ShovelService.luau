@@ -145,6 +145,8 @@ function ShovelService._BindPlayerShovels(player: Player, character: Model, char
 
 	local function onToolStateChanged()
 		ShovelService._UpdateHolsterState(player, character)
+		local PlayerService = require(script.Parent:WaitForChild("PlayerService"))
+		PlayerService.SyncPlayerStats(player)
 	end
 
 	-- Listen for tools moving between Backpack and Character

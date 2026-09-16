@@ -50,46 +50,66 @@ Follow the **Controller-Service-Repository** pattern. Never mix network, busines
   - Use `Trove:Extend()` for temporary states (Equipped Tool, Combat, Zone Entry) and call `subTrove:Clean()` when the state ends.
   - NEVER use `:Remove()` or `Parent = nil`. Always use `:Destroy()`.
 
-## 🎨 6. Strict UI Architecture & 3D Styling System
+## 🎨 6. Strict UI Architecture & Procedural 3D Styling System
 
 ### A. Mobile-First Responsive Breakpoint Philosophy
-- **Base Design on Mobile (Portrait & Landscape):** All UI sizing and layouts must be designed and verified for narrow mobile screens first.
-- **Scale over Offset (with Constraints):**
-  - Use **Scale** for relative container sizing, coupled with `UIAspectRatioConstraint` to prevent buttons, slots, and frames from stretching or distorting across varied aspect ratios.
-  - Use `UISizeConstraint` to define `MinSize` (preventing text/buttons from becoming illegible or unclickable on phones) and `MaxSize` (preventing elements from ballooning on 1440p/4K PC displays).
-- **Breakpoint Context Hook:** Implement a screen breakpoint provider (`useDeviceType()` or `useScreenBounds()`) that automatically shifts layout layouts when switching between Mobile (`CurrentCamera.ViewportSize.X < 700`) and Tablet/PC.
+- **Viewport Agnostic First (Mobile Dominant):** All UI sizing and layouts must be designed and verified for narrow mobile viewports prior to adapting to tablet, console, or desktop displays.
+- **Scale over Offset (with Strict Boundary Constraints):**
+  - Use **Scale** for relative layout framing, paired strictly with `UIAspectRatioConstraint` to prevent geometric distortion across dynamic aspect ratios.
+  - Use **Offset** exclusively for tactile bevel depth, shadow displacements, and pixel-crisp borders.
+  - Enforce `UISizeConstraint` with `MinSize` (minimum tap target area of `44x44` px for mobile ergonomics) and `MaxSize` (preventing visual ballooning on 1440p/4K PC displays).
+- **Reactive Breakpoint Context Hook:**
+  - Consume a centralized viewport observer (`useDeviceBreakpoint()` or `Camera:GetPropertyChangedSignal("ViewportSize")`) that emits distinct device tiers:
+    * `Compact` (`ViewportSize.X < 700`)
+    * `Medium` (`700 <= ViewportSize.X < 1100`)
+    * `Expanded` (`ViewportSize.X >= 1100`)
+  - Redundant local `ViewportSize` polling across individual components is strictly prohibited.
 
-### B. Procedural 3D Bevel & Container Hierarchy
-3D bevel buttons, progress bars, and containers must NOT rely on static 9-slice image assets. Instead, construct them via procedural declarative sub-layering:
-1. **Base / Shadow Layer (Bottom):**
-   - Color: Procedurally darkened base color (`Color3:Lerp(Color3.fromRGB(0, 0, 0), 0.35)`).
-   - Shape: Matches the parent container using identical `UICorner` radius.
-2. **Top Face Surface Layer (Interactive Element):**
-   - Positioned above the shadow layer with a vertical offset (e.g., `-4px` to `-8px` or `-0.08 scale Y`) to establish genuine 3D visual depth.
-   - Color: The designated primary theme color (e.g., Lime Green, Cyan, Purple).
-3. **Glossy / Shine Overlay (Reflective Gradient):**
-   - **Strict Containment & Clipping:** MUST be parented DIRECTLY inside the Top Face Surface Layer (or an inner clipped container). The parent layer MUST have `ClipsDescendants = true` so the shine NEVER overflows outside the border edges or rounded corners.
-   - **Position & Sizing:** Positioned flush inside the top boundary (`Position = UDim2.fromScale(0.02, 0.04)` or `fromScale(0, 0)` with proper padding), occupying only the upper half of the face (`Size = UDim2.new(0.96, 0, 0.42, 0)`).
-   - **Styling:** Styled with a transparent white `UIGradient` (`Transparency = NumberSequence.new({0.25, 0.9})`, `Rotation = 90`) and an inner `UICorner` to produce a tight, enclosed specular glass highlight without edge bleeding.
-4. **Border Stroke Layer:**
-   - Use `UIStroke` configured with a contrasting darker tone (`Thickness = 2-3px`, `ApplyStrokeMode = Border`) to deliver a sharp, stylized cartoon border.
+### B. Procedural 3D Bevel, Layer Hierarchy & Technical Art Pipeline
+Static 9-slice raster/PNG assets for 3D buttons, progress bars, and modular panels are strictly prohibited. Construct tactile components procedurally via native engine sub-layering:
+
+1. **Base / Shadow Layer (Bezel Datum):**
+   - **Position & Sizing:** Anchored at the root level (`ZIndex = 1`), establishing the downward extrusion profile.
+   - **Color Formulation:** Procedurally derived via mathematical lerping (`baseColor:Lerp(Color3.new(0, 0, 0), 0.35)`).
+   - **Contour:** Matches parent geometry using a unified `UICorner` radius.
+2. **Top Face Surface Layer (Interactive Plate):**
+   - **Depth Elevation:** Displaced upward along the Y-axis (`Position = UDim2.new(0, 0, 0, -BezelDepthOffset)`, default `-4px` to `-6px`) to produce genuine visual depth.
+   - **Color Tone:** Bound directly to the designated component theme token (`baseColor`).
+   - **Border Outline:** Styled with a contrasting darker tone via `UIStroke` (`Thickness = 2-3px`, `ApplyStrokeMode = Border`).
+3. **Glossy / Specular Overlay (Dynamic Optical Cap):**
+   - **Strict Containment:** Must be parented inside the Top Face Surface Layer with `ClipsDescendants = true` to completely eliminate highlight bleeding outside rounded corners.
+   - **Geometry:** Flush along the top boundary (`Position = UDim2.fromScale(0, 0)`), covering the upper portion of the surface (`Size = UDim2.new(1, 0, 0.45, 0)`).
+   - **Optical Gradient:** Rendered using a linear white `UIGradient` (`Transparency = NumberSequence.new({0.20, 0.95})`, `Rotation = 90`) paired with matching `UICorner` to produce a crisp specular reflection.
+4. **Draw-Call & Batching Integrity:**
+   - Maintain uniform `ZIndex` stratification across sibling components to preserve Roblox UI batch rendering.
+   - Never nest `CanvasGroup` within another `CanvasGroup` to prevent redundant texture memory allocation and GPU mipmap downscaling artifacts.
 
 ### C. Hover & Press Physics (Spring-Driven Animation)
-- **Zero TweenService for Hover/Press Interactions:** Do not use linear or rigid `TweenService` routines for cursor or touch feedback.
-- **Spring-Driven Displacement (`Spring` library):**
-  - **Idle State:** Surface face elevated (`Y Offset = -6px`).
-  - **Hover State (PC):** Surface face springs upward (`Y Offset = -8px`) with micro-scaling (`1.03x`).
-  - **Pressed State (Click/Touch):** Surface face depresses downward flush against the Shadow Layer (`Y Offset = -1px`) to replicate tactile mechanical button physics.
-- **Client-Side Only:** All spring state simulations, hover transitions, and click bounces must execute entirely on the client with zero network invocation.
+- **Banned: TweenService for Input Transitions:** Linear or easing `TweenService` routines are strictly banned for hover, press, and release micro-interactions.
+- **Spring Dynamics Modeling (Physics-Based Feedback):**
+  - Implement dynamic transforms via second-order physical spring equations (`Frequency = 4.5`, `DampingRatio = 0.65`):
+    * **Idle State:** Surface face rested at elevated default (`Y Offset = -6px`, `Scale = 1.0`).
+    * **Hover State (Mouse Input):** Surface face springs upward (`Y Offset = -9px`, `Scale = 1.03`) with an optical gloss boost (`Transparency -0.1`).
+    * **Pressed State (InputBegan):** Surface face depresses flush against the base datum (`Y Offset = -1px`, `Scale = 0.97`) to reproduce mechanical switch resistance.
+    * **Release State (InputEnded):** Elastic recoil returning cleanly to Hover or Idle state without overshoot vibration.
+- **Client-Side Authoritative Runtime:** All physical spring calculations, mouse tracking, and tap animations must execute entirely on the client thread with zero network latency.
 
-### D. Component Reusability & Pure Theming
-- All 3D containers and buttons must be implemented as atomic, reusable components accepting dynamic props:
-  - `baseColor: Color3` (Used to procedurally derive shadow, stroke, and highlight palettes via `:Lerp()`).
-  - `size: UDim2`
-  - `aspectRatio: number?`
-  - `onActivated: () -> ()`
-  - `children: any` (Text, Icon, ProgressBar fill, or item slot content).
-- UI components must remain completely decoupled from game transactions: never query `DataStore` or invoke network events directly from within a UI component.
+### D. Declarative Theming & Component Decoupling
+- **Procedural Palette Synthesis:** Hardcoded sub-colors are disallowed. A single input token generates all auxiliary states:
+  * `ShadowColor = baseColor:Lerp(Color3.new(0, 0, 0), 0.35)`
+  * `StrokeColor = baseColor:Lerp(Color3.new(0, 0, 0), 0.55)`
+  * `HighlightColor = baseColor:Lerp(Color3.new(1, 1, 1), 0.20)`
+- **Strict Prop Interface Definition:**
+  * `Size: UDim2`
+  * `AspectRatio: number?`
+  * `BaseColor: Color3`
+  * `BezelDepth: number?`
+  * `Disabled: boolean?` (Triggers grayscale saturation drop and disconnects raycast/hit detection)
+  * `OnActivated: () -> ()`
+  * `Children: any?`
+- **Architectural Separation of Concerns:**
+  * UI components serve strictly as presentation layers (View Layer).
+  * Direct invocations of `DataStoreService`, `RemoteFunction:InvokeServer()`, or game state mutators from within UI elements are strictly forbidden; all state changes must propagate through a decoupled dispatch layer.
 
 ---
 

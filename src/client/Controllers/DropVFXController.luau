@@ -2,7 +2,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -15,120 +15,141 @@ DropVFXController.__index = DropVFXController
 
 local _controllerTrove = Trove.new()
 
--- Quadratic Bezier Curve Math
-local function quadraticBezier(t: number, p0: Vector3, p1: Vector3, p2: Vector3): Vector3
-	return (1 - t)^2 * p0 + 2 * (1 - t) * t * p1 + t^2 * p2
-end
-
 function DropVFXController.Init()
-	local disconnect = DigNetwork.DigResult.on(function(success: boolean, dropId: string?, amount: number, errorMsg: string?, player: Instance)
-		if success and dropId and player then
-			DropVFXController.PlayParabolicDrop(player, dropId)
+	local disconnect = DigNetwork.DigDropVFX.on(function(playerInstance: Instance, dropId: string)
+		if playerInstance and dropId then
+			DropVFXController.PlayParabolicDrop(playerInstance, dropId)
 		end
 	end)
-	
+
 	_controllerTrove:Add(disconnect)
 end
 
-function DropVFXController.PlayParabolicDrop(player: Instance, dropId: string)
-	if not player:IsA("Player") then return end
-	local char = player.Character
-	if not char or not char.PrimaryPart then return end
-	
-	local rootPart = char.PrimaryPart
-	local upperTorso = (char:FindFirstChild("UpperTorso") or rootPart) :: BasePart
-	
-	local dropAssetsFolder = ReplicatedStorage:FindFirstChild("Assets") and ReplicatedStorage.Assets:FindFirstChild("Drops")
+function DropVFXController.PlayParabolicDrop(playerInstance: Instance, dropId: string)
+	local char: Model? = nil
+	if playerInstance:IsA("Player") then
+		char = playerInstance.Character
+	elseif playerInstance:IsA("Model") then
+		char = playerInstance
+	end
+
+	if not char then return end
+
+	local rootPart: BasePart? = char.PrimaryPart
+	if not rootPart then return end
+
+	local upperTorsoPart: Instance? = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso") or rootPart
+	if not upperTorsoPart or not upperTorsoPart:IsA("BasePart") then return end
+	local upperTorso: BasePart = upperTorsoPart
+
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	local dropAssetsFolder = assets and assets:FindFirstChild("Drops")
 	if not dropAssetsFolder then return end
-	
-	-- Cari item di semua island (atau Island1)
-	local island1Drops = dropAssetsFolder:FindFirstChild("Island1")
-	if not island1Drops then return end
-	
-	local itemModel = island1Drops:FindFirstChild(dropId)
-	if not itemModel or not itemModel:IsA("Model") then return end
-	
-	local clone = itemModel:Clone()
-	
-	-- Pastikan model memiliki PrimaryPart
-	local primaryPart = clone.PrimaryPart
-	if not primaryPart then
-		local firstPart = clone:FindFirstChildWhichIsA("BasePart", true)
-		if firstPart then
-			clone.PrimaryPart = firstPart
-			primaryPart = firstPart
-		else
-			clone:Destroy()
-			return
+
+	-- Find item model in Island folders or root drops folder
+	local itemModel: Model? = nil
+	for _, folder in dropAssetsFolder:GetChildren() do
+		local found = folder:FindFirstChild(dropId)
+		if found and found:IsA("Model") then
+			itemModel = found
+			break
 		end
 	end
-	
-	-- Set semua part ke CanCollide = false & Anchored = true agar tidak ada physics server 
+
+	if not itemModel then
+		local found = dropAssetsFolder:FindFirstChild(dropId)
+		if found and found:IsA("Model") then
+			itemModel = found
+		end
+	end
+
+	if not itemModel then return end
+
+	local clone = itemModel:Clone()
+
+	-- Ensure PrimaryPart exists
+	local foundPart: BasePart? = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
+	if not foundPart then
+		clone:Destroy()
+		return
+	end
+
+	local primaryPart: BasePart = foundPart
+	clone.PrimaryPart = primaryPart
+
+	-- Weld all parts to primaryPart and configure collision/physics
+	local dropParts: { BasePart } = {}
 	for _, desc in clone:GetDescendants() do
 		if desc:IsA("BasePart") then
-			desc.CanCollide = false
-			desc.Anchored = true
+			table.insert(dropParts, desc)
+			desc.Anchored = false
+			desc.CanCollide = true
+			desc.CanTouch = false
+			desc.CanQuery = false
+			desc.CastShadow = true
+
+			if desc ~= primaryPart and not desc:FindFirstChildWhichIsA("WeldConstraint") then
+				local weld = Instance.new("WeldConstraint")
+				weld.Part0 = primaryPart
+				weld.Part1 = desc
+				weld.Parent = primaryPart
+			end
 		end
 	end
-	
-	clone.Parent = Workspace
-	
-	-- Titik Awal: Punggung Player
-	local p0 = upperTorso.CFrame.Position - (upperTorso.CFrame.LookVector * 1.5)
-	
-	-- Titik Akhir: Acak di belakang/samping punggung player di tanah
-	local randomAngle = math.rad(math.random(-60, 60))
-	local dropDistance = math.random(4, 7)
-	local backDir = (CFrame.new(Vector3.zero, rootPart.CFrame.LookVector) * CFrame.Angles(0, randomAngle + math.pi, 0)).LookVector
-	
-	local p2 = p0 + (backDir * dropDistance)
-	
-	-- Raycast ke bawah untuk memastikan jatuh ke tanah
-	local ray = RaycastParams.new()
-	ray.FilterType = Enum.RaycastFilterType.Exclude
-	ray.FilterDescendantsInstances = {char, clone}
-	local hit = Workspace:Raycast(p2 + Vector3.new(0, 10, 0), Vector3.new(0, -20, 0), ray)
-	if hit then
-		p2 = hit.Position + Vector3.new(0, primaryPart.Size.Y / 2, 0)
-	else
-		p2 = p2 - Vector3.new(0, 3, 0) -- fallback
+
+	-- Prevent physical collision with character parts so player isn't pushed
+	for _, charChild in char:GetDescendants() do
+		if charChild:IsA("BasePart") then
+			for _, dropPart in dropParts do
+				local noColl = Instance.new("NoCollisionConstraint")
+				noColl.Part0 = charChild
+				noColl.Part1 = dropPart
+				noColl.Parent = clone
+			end
+		end
 	end
-	
-	-- Control Point: Tengah-tengah p0 dan p2, dinaikkan ke atas (arch)
-	local p1 = (p0 + p2) / 2 + Vector3.new(0, math.random(5, 8), 0)
-	
+
+	-- Spawn Position: Right behind player's upper torso
+	local spawnPos = upperTorso.Position - (rootPart.CFrame.LookVector * 1.5) + Vector3.new(0, 0.8, 0)
+	local randomYaw = math.rad(math.random(0, 360))
+	clone:PivotTo(CFrame.new(spawnPos) * CFrame.Angles(0, randomYaw, 0))
+
+	clone.Parent = Workspace
+
+	-- Physical launch force: Throw backward and upward with natural ragdoll/tumble spin
+	local spreadX = math.random(-30, 30) / 100
+	local spreadZ = math.random(-30, 30) / 100
+	local backDir = (-rootPart.CFrame.LookVector + Vector3.new(spreadX, 0, spreadZ)).Unit
+
+	local forwardSpeed = math.random(14, 22)
+	local upwardSpeed = math.random(22, 32)
+	local launchVelocity = (backDir * forwardSpeed) + Vector3.new(0, upwardSpeed, 0)
+
+	local randomTorque = Vector3.new(
+		math.random(-25, 25),
+		math.random(-25, 25),
+		math.random(-25, 25)
+	)
+
+	primaryPart.AssemblyLinearVelocity = launchVelocity
+	primaryPart.AssemblyAngularVelocity = randomTorque
+
 	local dropTrove = _controllerTrove:Extend()
 	dropTrove:Add(clone)
-	
-	local duration = 0.8 -- durasi animasi
-	local startTime = os.clock()
-	local randRotationSpeed = Vector3.new(math.random(-10, 10), math.random(-10, 10), math.random(-10, 10))
-	
-	local conn; conn = RunService.RenderStepped:Connect(function()
-		local elapsed = os.clock() - startTime
-		local t = math.clamp(elapsed / duration, 0, 1)
-		
-		local currentPos = quadraticBezier(t, p0, p1, p2)
-		local currentRot = CFrame.Angles(
-			randRotationSpeed.X * elapsed, 
-			randRotationSpeed.Y * elapsed, 
-			randRotationSpeed.Z * elapsed
-		)
-		
-		clone:PivotTo(CFrame.new(currentPos) * currentRot)
-		
-		if t >= 1 then
-			conn:Disconnect()
-			
-			-- Hapus setelah 5 detik diam di tanah
-			task.delay(5, function()
-				dropTrove:Clean()
-			end)
+
+	-- Shrink & Clean up after 6 seconds
+	task.delay(5.0, function()
+		local shrinkInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		for _, part in dropParts do
+			TweenService:Create(part, shrinkInfo, {
+				Size = Vector3.new(0.01, 0.01, 0.01),
+				Transparency = 1,
+			}):Play()
 		end
-	end)
-	
-	dropTrove:Add(function()
-		conn:Disconnect()
+
+		task.delay(1.0, function()
+			dropTrove:Clean()
+		end)
 	end)
 end
 

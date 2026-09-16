@@ -10,6 +10,7 @@ export type ShovelConfig = {
 	displayName: string,
 	tier: number,
 	digPower: number,
+	luckBonus: number, -- e.g. 0 for +0%, 15 for +15%, 50 for +50%
 	cooldown: number,
 	isStarter: boolean,
 	assetName: string,

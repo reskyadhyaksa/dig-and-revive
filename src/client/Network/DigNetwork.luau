@@ -157,9 +157,13 @@ local Queue: any = {
 
 local SerdesEvent = "?"
 local SerdesThread: thread?
-Events.Reliable[1] = {}
 Queue.Reliable[1] = table.create(256)
-local function WriteEVENT_DigRequest(Value1: number, Value2: string): ()
+Queue.Reliable[3] = table.create(256)
+Queue.Reliable[4] = table.create(256)
+Events.Reliable[5] = {}
+Queue.Reliable[5] = table.create(256)
+Queue.Reliable[6] = table.create(256)
+local function WriteEVENT_StartDigRequest(Value1: number, Value2: string): ()
 	-- Allocate BLOCK: 11 bytes
 	local BLOCK_START = Allocate(11)
 	buffer.writeu8(SendBuffer, BLOCK_START + 0, 0)
@@ -170,9 +174,33 @@ local function WriteEVENT_DigRequest(Value1: number, Value2: string): ()
 	buffer.writestring(SendBuffer, SendOffset, Value2, Length)
 end
 
-local function ReadEVENT_DigResult(): (boolean, string?, number, string?, Instance)
-	-- Read BLOCK: 5 bytes
-	local BLOCK_START = Read(5)
+local function ReadEVENT_StartMinigame(): (string, number, number)
+	-- Read BLOCK: 12 bytes
+	local BLOCK_START = Read(12)
+	local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
+	local Value1 = buffer.readstring(RecieveBuffer, Read(Length), Length)
+	local Value2 = buffer.readu16(RecieveBuffer, BLOCK_START + 2)
+	local Value3 = buffer.readf64(RecieveBuffer, BLOCK_START + 4)
+	return Value1, Value2, Value3
+end
+
+local function WriteEVENT_SwingRequest(Value: nil): ()
+	-- Allocate BLOCK: 1 bytes
+	local BLOCK_START = Allocate(1)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 2)
+end
+
+local function ReadEVENT_MinigameHit(): (number, number)
+	-- Read BLOCK: 4 bytes
+	local BLOCK_START = Read(4)
+	local Value1 = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
+	local Value2 = buffer.readu16(RecieveBuffer, BLOCK_START + 2)
+	return Value1, Value2
+end
+
+local function ReadEVENT_MinigameComplete(): (boolean, string?, number, number, number, number, string?)
+	-- Read BLOCK: 17 bytes
+	local BLOCK_START = Read(17)
 	local Value1 = (buffer.readu8(RecieveBuffer, BLOCK_START + 0) == 1)
 	local Value2
 	if buffer.readu8(RecieveBuffer, BLOCK_START + 1) == 1 then
@@ -182,27 +210,64 @@ local function ReadEVENT_DigResult(): (boolean, string?, number, string?, Instan
 		Value2 = buffer.readstring(RecieveBuffer, Read(Length), Length)
 	end
 	local Value3 = buffer.readu16(RecieveBuffer, BLOCK_START + 2)
-	local Value4
-	if buffer.readu8(RecieveBuffer, BLOCK_START + 4) == 1 then
+	local Value4 = buffer.readu32(RecieveBuffer, BLOCK_START + 4)
+	local Value5 = buffer.readu32(RecieveBuffer, BLOCK_START + 8)
+	local Value6 = buffer.readu32(RecieveBuffer, BLOCK_START + 12)
+	local Value7
+	if buffer.readu8(RecieveBuffer, BLOCK_START + 16) == 1 then
 		-- Read BLOCK: 2 bytes
 		local BLOCK_START = Read(2)
 		local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
-		Value4 = buffer.readstring(RecieveBuffer, Read(Length), Length)
+		Value7 = buffer.readstring(RecieveBuffer, Read(Length), Length)
 	end
+	return Value1, Value2, Value3, Value4, Value5, Value6, Value7
+end
+
+local function ReadEVENT_DigDropVFX(): (Instance, string)
+	-- Read BLOCK: 2 bytes
+	local BLOCK_START = Read(2)
 	RecieveInstanceCursor += 1
-	local Value5 = RecieveInstances[RecieveInstanceCursor]
-	if typeof(Value5) ~= "Instance" then error(`Expected an Instance, got {typeof(Value5)} instead.`) end
-	if not Value5:IsA("Instance") then error(`Expected an Instance of type "Instance", got "{Value5.ClassName}" instead.`) end
+	local Value1 = RecieveInstances[RecieveInstanceCursor]
+	if typeof(Value1) ~= "Instance" then error(`Expected an Instance, got {typeof(Value1)} instead.`) end
+	if not Value1:IsA("Instance") then error(`Expected an Instance of type "Instance", got "{Value1.ClassName}" instead.`) end
+	local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
+	local Value2 = buffer.readstring(RecieveBuffer, Read(Length), Length)
+	return Value1, Value2
+end
+
+local function ReadEVENT_PlayerStatsSync(): (number, number, number, number, number)
+	-- Read BLOCK: 24 bytes
+	local BLOCK_START = Read(24)
+	local Value1 = buffer.readu32(RecieveBuffer, BLOCK_START + 0)
+	local Value2 = buffer.readu32(RecieveBuffer, BLOCK_START + 4)
+	local Value3 = buffer.readu32(RecieveBuffer, BLOCK_START + 8)
+	local Value4 = buffer.readu32(RecieveBuffer, BLOCK_START + 12)
+	local Value5 = buffer.readf64(RecieveBuffer, BLOCK_START + 16)
 	return Value1, Value2, Value3, Value4, Value5
 end
 
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
-	DigRequest = {
+	StartDigRequest = {
 		fire = NOOP
 	},
-	DigResult = {
+	StartMinigame = {
+		on = NOOP
+	},
+	SwingRequest = {
+		fire = NOOP
+	},
+	MinigameHit = {
+		on = NOOP
+	},
+	MinigameComplete = {
+		on = NOOP
+	},
+	DigDropVFX = {
+		on = NOOP
+	},
+	PlayerStatsSync = {
 		on = NOOP
 	},
 	})
@@ -248,16 +313,56 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 		local BLOCK_START = Read(1)
 		local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
 		if Index == 1 then
-			local Value1: boolean, Value2: string?, Value3: number, Value4: string?, Value5: Instance = ReadEVENT_DigResult()
-			if #Events.Reliable[1] > 0 then
-				for _, Listener in Events.Reliable[1] do
-					task.spawn(Listener, Value1, Value2, Value3, Value4, Value5)
-				end
+			local Value1: string, Value2: number, Value3: number = ReadEVENT_StartMinigame()
+			if Events.Reliable[1] ~= nil then
+				task.spawn(Events.Reliable[1], Value1, Value2, Value3)
 			else
 				if #Queue.Reliable[1] > 256 then
-					warn("[Blink]: Event queue of \"DigResult\" exceeded 256, did you forget to implement a listener?")
+					warn("[Blink]: Event queue of \"StartMinigame\" exceeded 256, did you forget to implement a listener?")
 				end
-				table.insert(Queue.Reliable[1], {Value1, Value2, Value3, Value4, Value5} :: {any})
+				table.insert(Queue.Reliable[1], {Value1, Value2, Value3} :: {any})
+			end
+		elseif Index == 3 then
+			local Value1: number, Value2: number = ReadEVENT_MinigameHit()
+			if Events.Reliable[3] ~= nil then
+				task.spawn(Events.Reliable[3], Value1, Value2)
+			else
+				if #Queue.Reliable[3] > 256 then
+					warn("[Blink]: Event queue of \"MinigameHit\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[3], {Value1, Value2} :: {any})
+			end
+		elseif Index == 4 then
+			local Value1: boolean, Value2: string?, Value3: number, Value4: number, Value5: number, Value6: number, Value7: string? = ReadEVENT_MinigameComplete()
+			if Events.Reliable[4] ~= nil then
+				task.spawn(Events.Reliable[4], Value1, Value2, Value3, Value4, Value5, Value6, Value7)
+			else
+				if #Queue.Reliable[4] > 256 then
+					warn("[Blink]: Event queue of \"MinigameComplete\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[4], {Value1, Value2, Value3, Value4, Value5, Value6, Value7} :: {any})
+			end
+		elseif Index == 5 then
+			local Value1: Instance, Value2: string = ReadEVENT_DigDropVFX()
+			if #Events.Reliable[5] > 0 then
+				for _, Listener in Events.Reliable[5] do
+					task.spawn(Listener, Value1, Value2)
+				end
+			else
+				if #Queue.Reliable[5] > 256 then
+					warn("[Blink]: Event queue of \"DigDropVFX\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[5], {Value1, Value2} :: {any})
+			end
+		elseif Index == 6 then
+			local Value1: number, Value2: number, Value3: number, Value4: number, Value5: number = ReadEVENT_PlayerStatsSync()
+			if Events.Reliable[6] ~= nil then
+				task.spawn(Events.Reliable[6], Value1, Value2, Value3, Value4, Value5)
+			else
+				if #Queue.Reliable[6] > 256 then
+					warn("[Blink]: Event queue of \"PlayerStatsSync\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[6], {Value1, Value2, Value3, Value4, Value5} :: {any})
 			end
 		end
 	end
@@ -284,22 +389,83 @@ end)
 local Returns = table.freeze({
 	stepReplication = StepReplication,
 
-	DigRequest = {
+	StartDigRequest = {
 		fire = function(Value1: number, Value2: string): ()
-			WriteEVENT_DigRequest(Value1, Value2)
+			WriteEVENT_StartDigRequest(Value1, Value2)
 		end
 	},
-	DigResult = {
-		on = function(Listener: (Value1: boolean, Value2: string?, Value3: number, Value4: string?, Value5: Instance) -> ()): () -> ()
-			table.insert(Events.Reliable[1], Listener)
+	StartMinigame = {
+		on = function(Listener: (Value1: string, Value2: number, Value3: number) -> ()): () -> ()
+			Events.Reliable[1] = Listener
 			for Index, Arguments in Queue.Reliable[1] do
 				task.spawn(Listener, table.unpack(Arguments))
 			end
 			Queue.Reliable[1] = {}
 			return function (): ()
-				local Index = table.find(Events.Reliable[1], Listener)
+				if Events.Reliable[1] == Listener then
+					Events.Reliable[1] = nil
+				end
+			end
+		end
+	},
+	SwingRequest = {
+		fire = function(Value: nil): ()
+			WriteEVENT_SwingRequest(Value)
+		end
+	},
+	MinigameHit = {
+		on = function(Listener: (Value1: number, Value2: number) -> ()): () -> ()
+			Events.Reliable[3] = Listener
+			for Index, Arguments in Queue.Reliable[3] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[3] = {}
+			return function (): ()
+				if Events.Reliable[3] == Listener then
+					Events.Reliable[3] = nil
+				end
+			end
+		end
+	},
+	MinigameComplete = {
+		on = function(Listener: (Value1: boolean, Value2: string?, Value3: number, Value4: number, Value5: number, Value6: number, Value7: string?) -> ()): () -> ()
+			Events.Reliable[4] = Listener
+			for Index, Arguments in Queue.Reliable[4] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[4] = {}
+			return function (): ()
+				if Events.Reliable[4] == Listener then
+					Events.Reliable[4] = nil
+				end
+			end
+		end
+	},
+	DigDropVFX = {
+		on = function(Listener: (Value1: Instance, Value2: string) -> ()): () -> ()
+			table.insert(Events.Reliable[5], Listener)
+			for Index, Arguments in Queue.Reliable[5] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[5] = {}
+			return function (): ()
+				local Index = table.find(Events.Reliable[5], Listener)
 				if Index ~= nil then
-					table.remove(Events.Reliable[1], Index)
+					table.remove(Events.Reliable[5], Index)
+				end
+			end
+		end
+	},
+	PlayerStatsSync = {
+		on = function(Listener: (Value1: number, Value2: number, Value3: number, Value4: number, Value5: number) -> ()): () -> ()
+			Events.Reliable[6] = Listener
+			for Index, Arguments in Queue.Reliable[6] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[6] = {}
+			return function (): ()
+				if Events.Reliable[6] == Listener then
+					Events.Reliable[6] = nil
 				end
 			end
 		end

@@ -2,16 +2,51 @@ option Casing = Camel
 option ClientOutput = "../../client/Network/DigNetwork"
 option ServerOutput = "../../server/Network/DigNetwork"
 
-event DigRequest {
+event StartDigRequest {
     From: Client,
     Type: Reliable,
     Call: SingleAsync,
     Data: (f64, string),
 }
 
-event DigResult {
+event StartMinigame {
+    From: Server,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: (string, u16, f64),
+}
+
+event SwingRequest {
+    From: Client,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: (),
+}
+
+event MinigameHit {
+    From: Server,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: (u16, u16),
+}
+
+event MinigameComplete {
+    From: Server,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: (boolean, string?, u16, u32, u32, u32, string?),
+}
+
+event DigDropVFX {
     From: Server,
     Type: Reliable,
     Call: ManyAsync,
-    Data: (boolean, string?, u16, string?, Instance),
+    Data: (Instance, string),
+}
+
+event PlayerStatsSync {
+    From: Server,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: (u32, u32, u32, u32, f64),
 }

@@ -7,6 +7,8 @@ local React = require(Packages:WaitForChild("React"))
 
 local ZoneNotificationBanner = require(script.Parent.Components.ZoneNotificationBanner)
 local HoldPowerBar = require(script.Parent.Components.HoldPowerBar)
+local DigMinigame = require(script.Parent.Components.DigMinigame)
+local StatsHUD = require(script.Parent.Components.StatsHUD)
 local ZoneController = require(script.Parent.Parent.Controllers.ZoneController)
 local DigController = require(script.Parent.Parent.Controllers.DigController)
 
@@ -24,10 +26,24 @@ local function App(): any
 		visible = false,
 		themeColor = nil :: Color3?,
 	})
-	
-	local digUIState, setDigUIState = React.useState({
+
+	local holdPowerState, setHoldPowerState = React.useState({
 		visible = false,
 		power = 0,
+	})
+
+	local minigameState, setMinigameState = React.useState({
+		visible = false,
+		progress = 0,
+		remainingTime = 15,
+	})
+
+	local playerStats, setPlayerStats = React.useState({
+		level = 1,
+		exp = 0,
+		requiredExp = 100,
+		coins = 0,
+		luckMultiplier = 1.0,
 	})
 
 	React.useEffect(function()
@@ -77,17 +93,43 @@ local function App(): any
 				end)
 			end
 		end)
-		
-		local digConn = DigController.UIStateChanged:Connect(function(visible: boolean, power: number)
-			setDigUIState({
+
+		local powerConn = DigController.PowerBarStateChanged:Connect(function(visible: boolean, power: number)
+			setHoldPowerState({
 				visible = visible,
 				power = power,
 			})
 		end)
 
+		local minigameConn = DigController.MinigameStateChanged:Connect(function(visible: boolean, progress: number, remainingTime: number)
+			setMinigameState({
+				visible = visible,
+				progress = progress,
+				remainingTime = remainingTime,
+			})
+		end)
+
+		local statsConn = DigController.PlayerStatsChanged:Connect(function(
+			level: number,
+			exp: number,
+			requiredExp: number,
+			coins: number,
+			luckMultiplier: number
+		)
+			setPlayerStats({
+				level = level,
+				exp = exp,
+				requiredExp = requiredExp,
+				coins = coins,
+				luckMultiplier = luckMultiplier,
+			})
+		end)
+
 		return function()
 			conn:Disconnect()
-			digConn:Disconnect()
+			powerConn:Disconnect()
+			minigameConn:Disconnect()
+			statsConn:Disconnect()
 			if timerThread then
 				task.cancel(timerThread)
 			end
@@ -105,10 +147,27 @@ local function App(): any
 			visible = notifState.visible,
 			themeColor = notifState.themeColor,
 		}),
-		
-		DigPowerBar = React.createElement(HoldPowerBar, {
-			visible = digUIState.visible,
-			power = digUIState.power,
+
+		HoldPowerBar = React.createElement(HoldPowerBar, {
+			visible = holdPowerState.visible,
+			power = holdPowerState.power,
+		}),
+
+		DigMinigame = React.createElement(DigMinigame, {
+			visible = minigameState.visible,
+			progress = minigameState.progress,
+			remainingTime = minigameState.remainingTime,
+			onSwing = function()
+				DigController.Swing()
+			end,
+		}),
+
+		StatsHUD = React.createElement(StatsHUD, {
+			level = playerStats.level,
+			exp = playerStats.exp,
+			requiredExp = playerStats.requiredExp,
+			coins = playerStats.coins,
+			luckMultiplier = playerStats.luckMultiplier,
 		}),
 	})
 end

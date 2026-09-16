@@ -6,27 +6,24 @@ local RunService = game:GetService("RunService")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("React"))
 
-export type Props = {
-	visible: boolean,
-	power: number, -- 0.0 to 1.0
-}
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local PowerBarHelper = require(Shared:WaitForChild("Common"):WaitForChild("PowerBarHelper"))
+local UITypes = require(Shared:WaitForChild("Types"):WaitForChild("UITypes"))
+local useDeviceType = require(script.Parent.Parent:WaitForChild("Hooks"):WaitForChild("useDeviceType"))
+
+export type Props = UITypes.HoldPowerBarProps
 
 local function HoldPowerBar(props: Props): any
-	local themeColor = Color3.fromRGB(241, 196, 15) -- Sunflower Yellow
-	local shadowColor = themeColor:Lerp(Color3.fromRGB(0, 0, 0), 0.4)
-	local strokeColor = themeColor:Lerp(Color3.fromRGB(0, 0, 0), 0.6)
-	
-	local backColor = Color3.fromRGB(44, 62, 80) -- Dark background for the bar
+	local deviceInfo = useDeviceType()
+	local isMobile = deviceInfo.isMobile
 
-	-- Spring-like smooth transition state for visibility
+	-- Smooth transition animation state (Fade + Slide)
 	local animProgress, setAnimProgress = React.useState(0)
-	
-	-- Smooth power bar interpolation
+	-- Smooth power display
 	local displayPower, setDisplayPower = React.useState(0)
 
 	React.useEffect(function()
 		local targetVis = if props.visible then 1 else 0
-		local isMounted = true
 		local conn: RBXScriptConnection? = nil
 
 		conn = RunService.RenderStepped:Connect(function(dt: number)
@@ -35,20 +32,19 @@ local function HoldPowerBar(props: Props): any
 				if math.abs(diff) < 0.01 then
 					return targetVis
 				end
-				return prev + diff * math.clamp(dt * 12, 0, 1)
+				return prev + diff * math.clamp(dt * 14, 0, 1)
 			end)
-			
+
 			setDisplayPower(function(prev)
 				local diff = props.power - prev
-				if math.abs(diff) < 0.01 then
+				if math.abs(diff) < 0.005 then
 					return props.power
 				end
-				return prev + diff * math.clamp(dt * 15, 0, 1)
+				return prev + diff * math.clamp(dt * 20, 0, 1)
 			end)
 		end)
 
 		return function()
-			isMounted = false
 			if conn then
 				conn:Disconnect()
 			end
@@ -59,90 +55,127 @@ local function HoldPowerBar(props: Props): any
 		return nil
 	end
 
-	-- Slide in from the right
-	local currentXScale = 0.95 + (0.05 * (1 - animProgress))
 	local currentTransparency = 1 - animProgress
+	local multiplier = PowerBarHelper.GetMultiplier(displayPower)
+	local dynamicColor = PowerBarHelper.GetDynamicProgressColor(displayPower)
+	local transparencyCutoff = PowerBarHelper.GetProgressTransparency(displayPower)
+
+	-- Responsive sizing and positioning
+	local wrapperSize = if isMobile
+		then UDim2.fromScale(0.10, 0.32)
+		else UDim2.fromScale(0.06, 0.28)
+
+	-- Subtle slide in from right
+	local baseX = 0.64
+	local currentX = baseX + (0.04 * (1 - animProgress))
+	local wrapperPos = UDim2.fromScale(currentX, 0.44)
+
+	local luckLabelPos = if isMobile
+		then UDim2.fromScale(0.10, 0.69)
+		else UDim2.fromScale(0.18, 0.67)
+
+	local luckLabelSize = if isMobile
+		then UDim2.fromScale(2.0, 0.10)
+		else UDim2.fromScale(2.0, 0.09)
 
 	return React.createElement("Frame", {
-		AnchorPoint = Vector2.new(1, 0.5), -- Right anchored
-		Position = UDim2.fromScale(currentXScale, 0.5),
-		Size = UDim2.new(0.06, 0, 0.3, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = wrapperPos,
+		Size = wrapperSize,
 		BackgroundTransparency = 1,
+		ZIndex = 15,
 	}, {
-		SizeConstraint = React.createElement("UISizeConstraint", {
-			MinSize = Vector2.new(40, 200),
-			MaxSize = Vector2.new(80, 400),
+		AspectRatio = React.createElement("UIAspectRatioConstraint", {
+			AspectRatio = 0.364,
+			DominantAxis = Enum.DominantAxis.Height,
 		}),
 
-		-- 1. Base / Shadow Layer (3D Depth bottom)
-		ShadowLayer = React.createElement("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.52),
-			Size = UDim2.fromScale(1, 0.98),
-			BackgroundColor3 = Color3.fromRGB(20, 30, 40),
-			BackgroundTransparency = currentTransparency,
-			BorderSizePixel = 0,
+		SizeConstraint = React.createElement("UISizeConstraint", {
+			MinSize = Vector2.new(32, 130),
+			MaxSize = Vector2.new(90, 360),
+		}),
+
+		-- 1. MultiplierLabel ("1.0X" to "2.5X")
+		MultiplierLabel = React.createElement("TextLabel", {
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.fromScale(0.5, 0.08),
+			Size = UDim2.fromScale(1.0, 0.12),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.LuckiestGuy,
+			Text = string.format("%.1fX", multiplier),
+			TextColor3 = dynamicColor,
+			TextTransparency = currentTransparency,
+			TextScaled = true,
+			ZIndex = 5,
 		}, {
-			Corner = React.createElement("UICorner", {
-				CornerRadius = UDim.new(0, 12),
+			Stroke = React.createElement("UIStroke", {
+				Color = Color3.fromRGB(0, 0, 0),
+				Thickness = 2,
+				Transparency = currentTransparency,
 			}),
 		}),
 
-		-- 2. Top Face Surface Layer (Background of bar)
-		FaceLayer = React.createElement("Frame", {
+		-- 2. LuckBoostLabel ("LUCK BOOST" vertical rotated label)
+		LuckBoostLabel = React.createElement("TextLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.48),
-			Size = UDim2.fromScale(1, 0.98),
-			BackgroundColor3 = backColor,
-			BackgroundTransparency = currentTransparency,
+			Position = luckLabelPos,
+			Size = luckLabelSize,
+			Rotation = -90,
+			BackgroundTransparency = 1,
+			Font = Enum.Font.LuckiestGuy,
+			Text = "LUCK BOOST",
+			TextColor3 = Color3.fromRGB(255, 255, 255),
+			TextTransparency = currentTransparency,
+			TextScaled = true,
+			ZIndex = 4,
+		}, {
+			Stroke = React.createElement("UIStroke", {
+				Color = Color3.fromRGB(0, 0, 0),
+				Thickness = 1.5,
+				Transparency = currentTransparency,
+			}),
+		}),
+
+		-- 3. CapsuleContainer (Outer Dark Capsule)
+		CapsuleContainer = React.createElement("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.55),
+			Size = UDim2.fromScale(0.35, 0.82),
+			BackgroundColor3 = Color3.fromRGB(20, 25, 35),
+			BackgroundTransparency = math.clamp(0.5 + (0.5 * currentTransparency), 0, 1),
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
+			ZIndex = 2,
 		}, {
 			Corner = React.createElement("UICorner", {
-				CornerRadius = UDim.new(0, 12),
+				CornerRadius = UDim.new(1, 0),
 			}),
 
 			BorderStroke = React.createElement("UIStroke", {
-				Color = strokeColor,
+				Color = Color3.fromRGB(255, 255, 255),
 				Thickness = 2.5,
 				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 				Transparency = currentTransparency,
 			}),
 
-			-- 3. The Fill Bar (Power)
+			-- 4. FillBar (Vertical Full Layer with Dynamic Gradient Cutoff)
 			FillBar = React.createElement("Frame", {
-				AnchorPoint = Vector2.new(0.5, 1), -- Bottom anchored
-				Position = UDim2.fromScale(0.5, 1),
-				Size = UDim2.fromScale(1, displayPower),
-				BackgroundColor3 = themeColor,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromScale(1, 1),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 				BackgroundTransparency = currentTransparency,
 				BorderSizePixel = 0,
+				ZIndex = 3,
 			}, {
 				Corner = React.createElement("UICorner", {
-					CornerRadius = UDim.new(0, 12),
+					CornerRadius = UDim.new(1, 0),
 				}),
-				
-				-- 4. Glossy / Shine Overlay (inside the fill bar)
-				GlossyOverlay = React.createElement("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0),
-					Position = UDim2.new(0.5, 0, 0, 2),
-					Size = UDim2.new(1, -6, 1, 0), -- Full height of the fill
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-					BackgroundTransparency = 0,
-					BorderSizePixel = 0,
-					ZIndex = 2,
-				}, {
-					Corner = React.createElement("UICorner", {
-						CornerRadius = UDim.new(0, 9),
-					}),
-					Gradient = React.createElement("UIGradient", {
-						Rotation = 90,
-						Transparency = NumberSequence.new({
-							NumberSequenceKeypoint.new(0, 0.25),
-							NumberSequenceKeypoint.new(0.4, 0.92),
-							NumberSequenceKeypoint.new(1, 1),
-						}),
-					}),
+
+				ColorGradient = React.createElement("UIGradient", {
+					Rotation = 90,
+					Color = PowerBarHelper.VerticalColorSequence,
+					Transparency = transparencyCutoff,
 				}),
 			}),
 		}),

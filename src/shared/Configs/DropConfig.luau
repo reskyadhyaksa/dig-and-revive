@@ -30,8 +30,8 @@ local DropConfigModule = {
 }
 
 -- Fungsi murni untuk menghitung hasil galian (RNG)
--- minigameBonusPower: 0.0 sampai 1.0 (0% - 100% bonus chance untuk item langka)
-function DropConfigModule.RollDrop(islandId: string, minigameBonusPower: number): DropItem?
+-- totalLuckMultiplier: Nilai pengali total (misal 1.0X hingga 5.0X+)
+function DropConfigModule.RollDrop(islandId: string, totalLuckMultiplier: number): DropItem?
 	local dropTable: { DropItem }? = DropTables[islandId]
 	if not dropTable then
 		return nil
@@ -44,25 +44,22 @@ function DropConfigModule.RollDrop(islandId: string, minigameBonusPower: number)
 		return a.baseProbability > b.baseProbability
 	end)
 
+	local luck = math.max(1.0, totalLuckMultiplier)
 	local randomValue = math.random()
 
 	for _, item in sortedDrops do
-		-- Peluang dasar: 1 / baseProbability (misal 1 / 750000)
-		local chance = 1 / item.baseProbability
-		
-		-- Bonus dari minigame (misal max power = +50% chance dari chance dasar)
-		local bonusMultiplier = 1 + (minigameBonusPower * 0.5) 
-		local totalChance = chance * bonusMultiplier
+		-- Peluang efektif: (1 / baseProbability) * luck
+		local chance = (1 / item.baseProbability) * luck
 
-		if randomValue <= totalChance then
+		if randomValue <= chance then
 			return item
 		end
-		
+
 		-- Kurangi pool probabilitas yang tersisa
-		randomValue = randomValue - totalChance
+		randomValue = randomValue - chance
 	end
-	
-	-- Jika tidak ada yang kena (walaupun sangat jarang jika total chance > 1), return item paling umum
+
+	-- Fallback jika roll tidak mengenai item langka
 	return sortedDrops[#sortedDrops]
 end
 

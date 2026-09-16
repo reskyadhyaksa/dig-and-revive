@@ -2,9 +2,11 @@
 
 local ZoneService = require(script.Services.ZoneService)
 local ShovelService = require(script.Services.ShovelService)
+local PlayerService = require(script.Services.PlayerService)
 local DigService = require(script.Services.DigService)
 
 -- 1. Initialize Core Services
+PlayerService.Init()
 ZoneService.Init()
 ShovelService.Init()
 DigService.Init()
