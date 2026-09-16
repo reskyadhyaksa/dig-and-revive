@@ -2,14 +2,12 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Trove = require(Packages:WaitForChild("Trove"))
+local Trove = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local ShovelConfig = require(Shared:WaitForChild("Configs"):WaitForChild("ShovelConfig"))
-local DropConfig = require(Shared:WaitForChild("Configs"):WaitForChild("DropConfig"))
-local LevelConfig = require(Shared:WaitForChild("Configs"):WaitForChild("LevelConfig"))
+local ShovelUtils = require(Shared:WaitForChild("Utils"):WaitForChild("ShovelUtils"))
+local DropUtils = require(Shared:WaitForChild("Utils"):WaitForChild("DropUtils"))
+local LevelUtils = require(Shared:WaitForChild("Utils"):WaitForChild("LevelUtils"))
 local PowerBarHelper = require(Shared:WaitForChild("Common"):WaitForChild("PowerBarHelper"))
 local DropTypes = require(Shared:WaitForChild("Types"):WaitForChild("DropTypes"))
 local DigNetwork = require(script.Parent.Parent:WaitForChild("Network"):WaitForChild("DigNetwork"))
@@ -17,7 +15,6 @@ local ZoneService = require(script.Parent:WaitForChild("ZoneService"))
 local PlayerService = require(script.Parent:WaitForChild("PlayerService"))
 
 type DropItem = DropTypes.DropItem
-
 type DigSession = {
 	player: Player,
 	islandId: string,
@@ -30,179 +27,80 @@ type DigSession = {
 }
 
 local DigService = {}
-DigService.__index = DigService
-
-local _serviceTrove = Trove.new()
+local _trove = Trove.new()
 local _playerLastDigEndTime: { [Player]: number } = {}
 local _activeSessions: { [Player]: DigSession } = {}
+local DEFAULT_DURATION = 15.0
 
-local DEFAULT_MINIGAME_DURATION = 15.0 -- 15 seconds
+local TIER_HP: { [DropTypes.RarityTier]: number } = {
+	Common = 3, Uncommon = 4, Epic = 5, Legendary = 6, Mythic = 8, Secret = 10,
+}
 
-local function GetNodeHpByTier(tier: DropTypes.RarityTier): number
-	if tier == "Common" then
-		return 3
-	elseif tier == "Uncommon" then
-		return 4
-	elseif tier == "Epic" then
-		return 5
-	elseif tier == "Legendary" then
-		return 6
-	elseif tier == "Mythic" then
-		return 8
-	elseif tier == "Secret" then
-		return 10
-	end
-	return 3
+local function SendFail(p: Player, msg: string)
+	DigNetwork.MinigameComplete.fire(p, false, nil, 0, 0, PlayerService.GetPlayerLevel(p), PlayerService.GetPlayerExp(p), msg)
 end
 
 function DigService.Init()
-	_serviceTrove:Connect(Players.PlayerRemoving, function(player: Player)
-		_playerLastDigEndTime[player] = nil
-		_activeSessions[player] = nil
+	_trove:Connect(Players.PlayerRemoving, function(p)
+		_playerLastDigEndTime[p] = nil
+		_activeSessions[p] = nil
 	end)
 
-	-- 1. Handle Start Dig Request from Client
-	local disconnectStart = DigNetwork.StartDigRequest.on(function(player: Player, power: number, islandId: string)
-		local char = player.Character
-		if not char then return end
-
-		local humanoid = char:FindFirstChildOfClass("Humanoid")
-		if not humanoid or humanoid.Health <= 0 then return end
-
+	_trove:Add(DigNetwork.StartDigRequest.on(function(p: Player, power: number, islandId: string)
+		local char = p.Character
+		if not char or not char:FindFirstChildOfClass("Humanoid") then return end
 		local tool = char:FindFirstChildWhichIsA("Tool")
-		if not tool then
-			local curLevel = PlayerService.GetPlayerLevel(player)
-			local curExp = PlayerService.GetPlayerExp(player)
-			DigNetwork.MinigameComplete.fire(player, false, nil, 0, 0, curLevel, curExp, "Tidak memegang sekop!")
-			return
-		end
+		local shovelCfg = if tool then ShovelUtils.GetShovelConfig(tool.Name) else nil
+		if not shovelCfg then SendFail(p, "Tidak memegang sekop valid!") return end
 
-		local shovelCfg = ShovelConfig.GetShovelConfig(tool.Name)
-		if not shovelCfg then
-			local curLevel = PlayerService.GetPlayerLevel(player)
-			local curExp = PlayerService.GetPlayerExp(player)
-			DigNetwork.MinigameComplete.fire(player, false, nil, 0, 0, curLevel, curExp, "Sekop tidak valid!")
-			return
-		end
-
-		-- Validasi Cooldown delay setelah cycle dig sebelumnya selesai
 		local now = os.clock()
-		local lastEndTime = _playerLastDigEndTime[player] or 0
-		if now - lastEndTime < shovelCfg.cooldown then
-			local curLevel = PlayerService.GetPlayerLevel(player)
-			local curExp = PlayerService.GetPlayerExp(player)
-			DigNetwork.MinigameComplete.fire(player, false, nil, 0, 0, curLevel, curExp, "Harap tunggu sebelum menggali lagi!")
-			return
-		end
+		if now - (_playerLastDigEndTime[p] or 0) < shovelCfg.cooldown then SendFail(p, "Harap tunggu sebelum menggali!") return end
 
-		-- Validasi Zona
-		local currentZone = ZoneService.GetPlayerCurrentZone(player)
-		if not currentZone or currentZone.islandId ~= islandId then
-			local curLevel = PlayerService.GetPlayerLevel(player)
-			local curExp = PlayerService.GetPlayerExp(player)
-			DigNetwork.MinigameComplete.fire(player, false, nil, 0, 0, curLevel, curExp, "Zona tidak valid!")
-			return
-		end
+		local zone = ZoneService.GetPlayerCurrentZone(p)
+		if not zone or zone.islandId ~= islandId then SendFail(p, "Zona tidak valid!") return end
 
-		-- Hitung Total Luck: PowerBarMultiplier * (BaseLuck(100) + LevelBonus + ShovelBonus) / 100
-		local normalizedPower = math.clamp(power or 0, 0, 1)
-		local powerMultiplier = PowerBarHelper.GetMultiplier(normalizedPower)
-		local levelMultiplier = PlayerService.GetLevelLuck(player)
-		local shovelLuckBonus = shovelCfg.luckBonus or 0
-		local playerLuckMultiplier = levelMultiplier + (shovelLuckBonus / 100)
-		local totalLuck = powerMultiplier * playerLuckMultiplier
+		local powerMult = PowerBarHelper.GetMultiplier(math.clamp(power or 0, 0, 1))
+		local totalLuck = powerMult * PlayerService.GetTotalPlayerLuck(p)
+		local drop = DropUtils.RollDrop(zone.islandId, totalLuck)
+		if not drop then _playerLastDigEndTime[p] = now SendFail(p, "Tidak ada item ditemukan.") return end
 
-		-- Roll RNG Drop
-		local drop = DropConfig.RollDrop(currentZone.islandId, totalLuck)
-
-		if not drop then
-			_playerLastDigEndTime[player] = now
-			local curLevel = PlayerService.GetPlayerLevel(player)
-			local curExp = PlayerService.GetPlayerExp(player)
-			DigNetwork.MinigameComplete.fire(player, false, nil, 0, 0, curLevel, curExp, "Tidak ada item yang ditemukan.")
-			return
-		end
-
-		local nodeHp = GetNodeHpByTier(drop.tier)
-
-		local session: DigSession = {
-			player = player,
-			islandId = islandId,
-			power = normalizedPower,
-			drop = drop,
-			currentHp = nodeHp,
-			maxHp = nodeHp,
-			expireTime = now + DEFAULT_MINIGAME_DURATION,
-			lastSwingTime = 0,
+		local hp = TIER_HP[drop.tier] or 3
+		_activeSessions[p] = {
+			player = p, islandId = islandId, power = power, drop = drop,
+			currentHp = hp, maxHp = hp, expireTime = now + DEFAULT_DURATION, lastSwingTime = 0,
 		}
+		DigNetwork.StartMinigame.fire(p, drop.tier, hp, DEFAULT_DURATION)
+	end))
 
-		_activeSessions[player] = session
-
-		-- Send minigame start parameters to client
-		DigNetwork.StartMinigame.fire(player, drop.tier, nodeHp, DEFAULT_MINIGAME_DURATION)
-	end)
-
-	-- 2. Handle Player Tap / Swing Request
-	local disconnectSwing = DigNetwork.SwingRequest.on(function(player: Player)
-		local session = _activeSessions[player]
-		if not session then return end
-
+	_trove:Add(DigNetwork.SwingRequest.on(function(p: Player)
+		local s = _activeSessions[p]
+		if not s then return end
 		local now = os.clock()
-
-		-- Check if session expired
-		if now > session.expireTime then
-			_activeSessions[player] = nil
-			_playerLastDigEndTime[player] = now
-			local curLevel = PlayerService.GetPlayerLevel(player)
-			local curExp = PlayerService.GetPlayerExp(player)
-			DigNetwork.MinigameComplete.fire(player, false, nil, 0, 0, curLevel, curExp, "Waktu minigame habis!")
+		if now > s.expireTime then
+			_activeSessions[p] = nil
+			_playerLastDigEndTime[p] = now
+			SendFail(p, "Waktu minigame habis!")
 			return
 		end
 
-		-- Debounce anti-spam swing (minimum 0.08s between clicks)
-		if now - session.lastSwingTime < 0.08 then
-			return
+		if now - s.lastSwingTime < 0.08 then return end
+		s.lastSwingTime = now
+		s.currentHp = math.max(0, s.currentHp - 1)
+		DigNetwork.MinigameHit.fire(p, s.currentHp, s.maxHp)
+
+		if s.currentHp <= 0 then
+			local won = s.drop
+			_activeSessions[p] = nil
+			_playerLastDigEndTime[p] = now
+			local expRes = PlayerService.AddExp(p, LevelUtils.GetTierExp(won.tier))
+			DigNetwork.MinigameComplete.fire(p, true, won.id, 1, expRes.gainedExp, expRes.newLevel, expRes.newExp, nil)
+			DigNetwork.DigDropVFX.fireAll(p, won.id)
 		end
-		session.lastSwingTime = now
-
-		-- Reduce Node HP
-		session.currentHp = math.max(0, session.currentHp - 1)
-
-		DigNetwork.MinigameHit.fire(player, session.currentHp, session.maxHp)
-
-		-- Check Win condition
-		if session.currentHp <= 0 then
-			local wonDrop = session.drop
-			_activeSessions[player] = nil
-			_playerLastDigEndTime[player] = now
-
-			-- Award EXP based on item rarity tier
-			local expReward = LevelConfig.GetTierExp(wonDrop.tier)
-			local expResult = PlayerService.AddExp(player, expReward)
-
-			-- Notify client that minigame is won with updated level & exp
-			DigNetwork.MinigameComplete.fire(
-				player,
-				true,
-				wonDrop.id,
-				1,
-				expResult.gainedExp,
-				expResult.newLevel,
-				expResult.newExp,
-				nil
-			)
-
-			-- Broadcast 3D Drop VFX simulation to all clients
-			DigNetwork.DigDropVFX.fireAll(player, wonDrop.id)
-		end
-	end)
-
-	_serviceTrove:Add(disconnectStart)
-	_serviceTrove:Add(disconnectSwing)
+	end))
 end
 
 function DigService.Destroy()
-	_serviceTrove:Clean()
+	_trove:Clean()
 	table.clear(_playerLastDigEndTime)
 	table.clear(_activeSessions)
 end

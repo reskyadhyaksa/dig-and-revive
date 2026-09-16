@@ -4,157 +4,96 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Trove = require(Packages:WaitForChild("Trove"))
+local Trove = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Trove"))
 
 local DigNetwork = require(script.Parent.Parent:WaitForChild("Network"):WaitForChild("DigNetwork"))
 
 local DropVFXController = {}
-DropVFXController.__index = DropVFXController
+local _trove = Trove.new()
 
-local _controllerTrove = Trove.new()
-
-function DropVFXController.Init()
-	local disconnect = DigNetwork.DigDropVFX.on(function(playerInstance: Instance, dropId: string)
-		if playerInstance and dropId then
-			DropVFXController.PlayParabolicDrop(playerInstance, dropId)
-		end
-	end)
-
-	_controllerTrove:Add(disconnect)
+local function FindDropModel(dropId: string): Model?
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	local drops = if assets then assets:FindFirstChild("Drops") else nil
+	if not drops then return nil end
+	for _, f in drops:GetChildren() do
+		local m = f:FindFirstChild(dropId)
+		if m and m:IsA("Model") then return m end
+	end
+	local direct = drops:FindFirstChild(dropId)
+	return if direct and direct:IsA("Model") then direct else nil
 end
 
-function DropVFXController.PlayParabolicDrop(playerInstance: Instance, dropId: string)
-	local char: Model? = nil
-	if playerInstance:IsA("Player") then
-		char = playerInstance.Character
-	elseif playerInstance:IsA("Model") then
-		char = playerInstance
-	end
-
-	if not char then return end
-
-	local rootPart: BasePart? = char.PrimaryPart
-	if not rootPart then return end
-
-	local upperTorsoPart: Instance? = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso") or rootPart
-	if not upperTorsoPart or not upperTorsoPart:IsA("BasePart") then return end
-	local upperTorso: BasePart = upperTorsoPart
-
-	local assets = ReplicatedStorage:FindFirstChild("Assets")
-	local dropAssetsFolder = assets and assets:FindFirstChild("Drops")
-	if not dropAssetsFolder then return end
-
-	-- Find item model in Island folders or root drops folder
-	local itemModel: Model? = nil
-	for _, folder in dropAssetsFolder:GetChildren() do
-		local found = folder:FindFirstChild(dropId)
-		if found and found:IsA("Model") then
-			itemModel = found
-			break
-		end
-	end
-
-	if not itemModel then
-		local found = dropAssetsFolder:FindFirstChild(dropId)
-		if found and found:IsA("Model") then
-			itemModel = found
-		end
-	end
-
-	if not itemModel then return end
-
-	local clone = itemModel:Clone()
-
-	-- Ensure PrimaryPart exists
-	local foundPart: BasePart? = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
-	if not foundPart then
-		clone:Destroy()
-		return
-	end
-
-	local primaryPart: BasePart = foundPart
-	clone.PrimaryPart = primaryPart
-
-	-- Weld all parts to primaryPart and configure collision/physics
-	local dropParts: { BasePart } = {}
+local function SetupDropParts(clone: Model, primaryPart: BasePart, char: Model): { BasePart }
+	local parts: { BasePart } = {}
 	for _, desc in clone:GetDescendants() do
 		if desc:IsA("BasePart") then
-			table.insert(dropParts, desc)
+			table.insert(parts, desc)
 			desc.Anchored = false
 			desc.CanCollide = true
 			desc.CanTouch = false
 			desc.CanQuery = false
-			desc.CastShadow = true
-
 			if desc ~= primaryPart and not desc:FindFirstChildWhichIsA("WeldConstraint") then
-				local weld = Instance.new("WeldConstraint")
-				weld.Part0 = primaryPart
-				weld.Part1 = desc
-				weld.Parent = primaryPart
+				local w = Instance.new("WeldConstraint")
+				w.Part0 = primaryPart
+				w.Part1 = desc
+				w.Parent = primaryPart
 			end
 		end
 	end
-
-	-- Prevent physical collision with character parts so player isn't pushed
-	for _, charChild in char:GetDescendants() do
-		if charChild:IsA("BasePart") then
-			for _, dropPart in dropParts do
+	for _, c in char:GetDescendants() do
+		if c:IsA("BasePart") then
+			for _, p in parts do
 				local noColl = Instance.new("NoCollisionConstraint")
-				noColl.Part0 = charChild
-				noColl.Part1 = dropPart
+				noColl.Part0 = c
+				noColl.Part1 = p
 				noColl.Parent = clone
 			end
 		end
 	end
+	return parts
+end
 
-	-- Spawn Position: Right behind player's upper torso
-	local spawnPos = upperTorso.Position - (rootPart.CFrame.LookVector * 1.5) + Vector3.new(0, 0.8, 0)
-	local randomYaw = math.rad(math.random(0, 360))
-	clone:PivotTo(CFrame.new(spawnPos) * CFrame.Angles(0, randomYaw, 0))
+function DropVFXController.PlayParabolicDrop(playerInst: Instance, dropId: string)
+	local char = if playerInst:IsA("Player") then playerInst.Character elseif playerInst:IsA("Model") then playerInst else nil
+	if not char or not char.PrimaryPart then return end
+	local root = char.PrimaryPart
+	local torso = (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso") or root) :: BasePart
 
+	local model = FindDropModel(dropId)
+	if not model then return end
+
+	local clone = model:Clone()
+	local primary = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
+	if not primary then clone:Destroy() return end
+	clone.PrimaryPart = primary
+
+	local parts = SetupDropParts(clone, primary, char)
+	local spawnPos = torso.Position - (root.CFrame.LookVector * 1.5) + Vector3.new(0, 0.8, 0)
+	clone:PivotTo(CFrame.new(spawnPos) * CFrame.Angles(0, math.rad(math.random(0, 360)), 0))
 	clone.Parent = Workspace
 
-	-- Physical launch force: Throw backward and upward with natural ragdoll/tumble spin
-	local spreadX = math.random(-30, 30) / 100
-	local spreadZ = math.random(-30, 30) / 100
-	local backDir = (-rootPart.CFrame.LookVector + Vector3.new(spreadX, 0, spreadZ)).Unit
+	local spread = Vector3.new(math.random(-30, 30) / 100, 0, math.random(-30, 30) / 100)
+	local backDir = (-root.CFrame.LookVector + spread).Unit
+	primary.AssemblyLinearVelocity = (backDir * math.random(14, 22)) + Vector3.new(0, math.random(22, 32), 0)
+	primary.AssemblyAngularVelocity = Vector3.new(math.random(-25, 25), math.random(-25, 25), math.random(-25, 25))
 
-	local forwardSpeed = math.random(14, 22)
-	local upwardSpeed = math.random(22, 32)
-	local launchVelocity = (backDir * forwardSpeed) + Vector3.new(0, upwardSpeed, 0)
-
-	local randomTorque = Vector3.new(
-		math.random(-25, 25),
-		math.random(-25, 25),
-		math.random(-25, 25)
-	)
-
-	primaryPart.AssemblyLinearVelocity = launchVelocity
-	primaryPart.AssemblyAngularVelocity = randomTorque
-
-	local dropTrove = _controllerTrove:Extend()
-	dropTrove:Add(clone)
-
-	-- Shrink & Clean up after 6 seconds
 	task.delay(5.0, function()
-		local shrinkInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		for _, part in dropParts do
-			TweenService:Create(part, shrinkInfo, {
-				Size = Vector3.new(0.01, 0.01, 0.01),
-				Transparency = 1,
-			}):Play()
+		local tInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		for _, p in parts do
+			TweenService:Create(p, tInfo, { Size = Vector3.new(0.01, 0.01, 0.01), Transparency = 1 }):Play()
 		end
-
-		task.delay(1.0, function()
-			dropTrove:Clean()
-		end)
+		task.delay(1.0, function() clone:Destroy() end)
 	end)
 end
 
+function DropVFXController.Init()
+	_trove:Add(DigNetwork.DigDropVFX.on(function(p, dropId)
+		if p and dropId then DropVFXController.PlayParabolicDrop(p, dropId) end
+	end))
+end
+
 function DropVFXController.Destroy()
-	_controllerTrove:Clean()
+	_trove:Clean()
 end
 
 return DropVFXController

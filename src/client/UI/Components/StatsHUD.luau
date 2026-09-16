@@ -2,90 +2,222 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("React"))
 
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local React = require(Packages:WaitForChild("React"))
-
-local Shared = ReplicatedStorage:WaitForChild("Shared")
-local UITypes = require(Shared:WaitForChild("Types"):WaitForChild("UITypes"))
+local UIBuilder = require(script.Parent.Parent:WaitForChild("Common"):WaitForChild("UIBuilder"))
+local UITypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"):WaitForChild("UITypes"))
 local useDeviceType = require(script.Parent.Parent:WaitForChild("Hooks"):WaitForChild("useDeviceType"))
 
 export type Props = UITypes.StatsHUDProps
 
+-- 🎨 THEME & DIMENSION CONFIG
+local THEME = {
+	Container = {
+		MobileSize = UDim2.fromScale(0.32, 0.12),
+		DesktopSize = UDim2.fromScale(0.21, 0.10),
+		MinSize = Vector2.new(190, 56),
+		MaxSize = Vector2.new(280, 68),
+	},
+	Icons = {
+		Coin = "rbxassetid://122992611665292",
+		Luck = "rbxassetid://100488739842115",
+		Anchor = Vector2.new(0.15, 0),
+		Position = UDim2.new(0.04, 0, -0.5, 0),
+		Size = UDim2.fromScale(0.38, 1.45),
+	},
+	Coin = {
+		Colors = { Color3.fromRGB(255, 215, 65), Color3.fromRGB(245, 170, 30), Color3.fromRGB(215, 125, 10) },
+		Shadow = Color3.fromRGB(160, 95, 0),
+		Border = Color3.fromRGB(255, 220, 80),
+		TextStroke = Color3.fromRGB(100, 50, 0),
+	},
+	Luck = {
+		Colors = { Color3.fromRGB(80, 235, 140), Color3.fromRGB(46, 204, 113), Color3.fromRGB(25, 150, 75) },
+		Shadow = Color3.fromRGB(18, 110, 50),
+		Border = Color3.fromRGB(140, 255, 180),
+		TextStroke = Color3.fromRGB(15, 75, 30),
+	},
+	Exp = {
+		ChassisBg = Color3.fromRGB(20, 26, 36),
+		Border = Color3.fromRGB(10, 14, 20),
+		BedBg = Color3.fromRGB(12, 16, 22),
+		LevelBoxBg = Color3.fromRGB(22, 28, 38),
+		BadgeColors = { Color3.fromHex("B8FA24"), Color3.fromHex("9CE81C"), Color3.fromHex("68C810") },
+		BadgeShadow = Color3.fromRGB(42, 92, 10),
+		BadgeBorder = Color3.fromRGB(35, 75, 8),
+		FillColors = { Color3.fromHex("45F6FF"), Color3.fromHex("00D2FF"), Color3.fromHex("0088DD") },
+	},
+}
+
 local function FormatNumber(num: number): string
 	local n = math.floor(num or 0)
-	if n >= 1000000 then
-		return string.format("%.1fM", n / 1000000)
-	elseif n >= 1000 then
-		return string.format("%.1fK", n / 1000)
-	end
+	if n >= 1000000 then return string.format("%.1fM", n / 1000000) end
+	if n >= 1000 then return string.format("%.1fK", n / 1000) end
 	return tostring(n)
 end
 
-local function StatsHUD(props: Props): any
-	local deviceInfo = useDeviceType()
-	local isMobile = deviceInfo.isMobile
+-- 🧩 Reusable Card Element
+local function StatCard(props: { icon: string, text: string, theme: typeof(THEME.Coin) })
+	return React.createElement("Frame", {
+		Size = UDim2.new(0.5, -3, 1, 0),
+		BackgroundTransparency = 1,
+	}, {
+		Plate = UIBuilder.BevelPlate({
+			shadowColor = props.theme.Shadow,
+			faceColor = props.theme.Colors[2],
+			gradientColors = props.theme.Colors,
+			borderColor = props.theme.Border,
+			children = {
+				Label = React.createElement("TextLabel", {
+					AnchorPoint = Vector2.new(0, 0.5),
+					Position = UDim2.fromScale(0.36, 0.5),
+					Size = UDim2.fromScale(0.60, 0.82),
+					BackgroundTransparency = 1,
+					Font = Enum.Font.FredokaOne,
+					Text = props.text,
+					TextColor3 = Color3.fromRGB(255, 255, 255),
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextScaled = true,
+					ZIndex = 4,
+				}, { Stroke = UIBuilder.TextStroke(props.theme.TextStroke, 1.6) }),
+			},
+		}),
 
-	-- Smooth EXP bar interpolation
+		Icon = React.createElement("ImageLabel", {
+			AnchorPoint = THEME.Icons.Anchor,
+			Position = THEME.Icons.Position,
+			Size = THEME.Icons.Size,
+			BackgroundTransparency = 1,
+			Image = props.icon,
+			ScaleType = Enum.ScaleType.Fit,
+			ZIndex = 10,
+		}, { Aspect = React.createElement("UIAspectRatioConstraint", { AspectRatio = 1 }) }),
+	})
+end
+
+-- 🧩 Level Box + Capsule Track
+local function ExpTubeBar(props: { level: number, exp: number, requiredExp: number, ratio: number })
+	local theme = THEME.Exp
+	return React.createElement("Frame", {
+		LayoutOrder = 2,
+		Size = UDim2.new(1, 0, 0.50, 0),
+		BackgroundTransparency = 1,
+	}, {
+		-- Right Track Tube (ZIndex 1 / -z1)
+		Track = React.createElement("Frame", {
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 44, 0.5, 0),
+			Size = UDim2.new(1, -44, 0.76, 0),
+			BackgroundColor3 = theme.ChassisBg,
+			BorderSizePixel = 0,
+			ZIndex = 1,
+		}, {
+			Corner = UIBuilder.PillCorner(),
+			Stroke = UIBuilder.Stroke(theme.Border, 2.5),
+			Bed = React.createElement("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.new(1, -6, 1, -6),
+				BackgroundColor3 = theme.BedBg,
+				BorderSizePixel = 0,
+				ClipsDescendants = true,
+				ZIndex = 2,
+			}, {
+				Corner = UIBuilder.PillCorner(),
+				Fill = React.createElement("Frame", {
+					Size = UDim2.new(props.ratio, 0, 1, 0),
+					BackgroundColor3 = Color3.fromRGB(0, 210, 255),
+					BorderSizePixel = 0,
+					ClipsDescendants = true,
+					ZIndex = 2,
+				}, {
+					Corner = UIBuilder.PillCorner(),
+					Gradient = UIBuilder.LinearGradient(theme.FillColors, 90),
+					Shine = UIBuilder.ShineOverlay(nil, 0.50, 0.82),
+				}),
+				Label = React.createElement("TextLabel", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.56, 0.5),
+					Size = UDim2.fromScale(0.78, 0.75),
+					BackgroundTransparency = 1,
+					Font = Enum.Font.FredokaOne,
+					Text = string.format("%d / %d", math.floor(props.exp), math.max(1, props.requiredExp)),
+					TextColor3 = Color3.fromRGB(255, 255, 255),
+					TextScaled = true,
+					ZIndex = 4,
+				}, { Stroke = UIBuilder.TextStroke(Color3.fromRGB(0, 0, 0), 1.4) }),
+			}),
+		}),
+
+		-- Left Level Box (ZIndex 2)
+		LevelBox = React.createElement("Frame", {
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 0, 0.5, 0),
+			Size = UDim2.new(0, 58, 1, 0),
+			BackgroundColor3 = theme.LevelBoxBg,
+			BorderSizePixel = 0,
+			ZIndex = 2,
+		}, {
+			Corner = UIBuilder.Corner(8),
+			Stroke = UIBuilder.Stroke(theme.Border, 2.5),
+			Badge = UIBuilder.BevelPlate({
+				position = UDim2.fromScale(0.5, 0.5),
+				anchorPoint = Vector2.new(0.5, 0.5),
+				size = UDim2.new(1, -6, 1, -6),
+				cornerRadius = 6,
+				shadowColor = theme.BadgeShadow,
+				faceColor = theme.BadgeColors[2],
+				gradientColors = theme.BadgeColors,
+				borderColor = theme.BadgeBorder,
+				children = {
+					Text = React.createElement("TextLabel", {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromScale(0.5, 0.5),
+						Size = UDim2.fromScale(0.92, 0.82),
+						BackgroundTransparency = 1,
+						Font = Enum.Font.FredokaOne,
+						Text = string.format("LV. %d", props.level),
+						TextColor3 = Color3.fromRGB(255, 255, 255),
+						TextScaled = true,
+						ZIndex = 4,
+					}, { Stroke = UIBuilder.TextStroke(Color3.fromRGB(12, 18, 8), 2.0) }),
+				},
+			}),
+		}),
+	})
+end
+
+-- 🚀 Root StatsHUD Component (< 45 lines!)
+local function StatsHUD(props: Props): any
+	local isMobile = useDeviceType().isMobile
 	local displayExp, setDisplayExp = React.useState(props.exp or 0)
 	local targetRatio = if props.requiredExp > 0 then math.clamp(props.exp / props.requiredExp, 0, 1) else 0
 	local displayRatio, setDisplayRatio = React.useState(targetRatio)
 
 	React.useEffect(function()
-		local conn: RBXScriptConnection? = nil
-		conn = RunService.RenderStepped:Connect(function(dt: number)
-			setDisplayRatio(function(prev)
-				local diff = targetRatio - prev
-				if math.abs(diff) < 0.005 then
-					return targetRatio
-				end
-				return prev + diff * math.clamp(dt * 12, 0, 1)
-			end)
-
-			setDisplayExp(function(prev)
-				local diff = props.exp - prev
-				if math.abs(diff) < 0.5 then
-					return props.exp
-				end
-				return prev + diff * math.clamp(dt * 12, 0, 1)
-			end)
+		local conn = RunService.RenderStepped:Connect(function(dt: number)
+			setDisplayRatio(function(prev) return prev + (targetRatio - prev) * math.clamp(dt * 14, 0, 1) end)
+			setDisplayExp(function(prev) return prev + (props.exp - prev) * math.clamp(dt * 12, 0, 1) end)
 		end)
-
-		return function()
-			if conn then
-				conn:Disconnect()
-			end
-		end
+		return function() conn:Disconnect() end
 	end, { props.exp, props.requiredExp } :: { any })
-
-	local totalLuckDisplay = math.floor(props.luckMultiplier * 100 + 0.5)
-
-	-- Balanced responsive container sizing
-	local containerSize = if isMobile
-		then UDim2.fromScale(0.32, 0.12)
-		else UDim2.fromScale(0.21, 0.10)
 
 	return React.createElement("Frame", {
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0.015, 0.985),
-		Size = containerSize,
+		Size = if isMobile then THEME.Container.MobileSize else THEME.Container.DesktopSize,
 		BackgroundTransparency = 1,
 		ZIndex = 10,
 	}, {
 		SizeConstraint = React.createElement("UISizeConstraint", {
-			MinSize = Vector2.new(190, 56),
-			MaxSize = Vector2.new(280, 68),
+			MinSize = THEME.Container.MinSize,
+			MaxSize = THEME.Container.MaxSize,
 		}),
-
 		ListLayout = React.createElement("UIListLayout", {
 			FillDirection = Enum.FillDirection.Vertical,
-			HorizontalAlignment = Enum.HorizontalAlignment.Left,
-			VerticalAlignment = Enum.VerticalAlignment.Bottom,
 			Padding = UDim.new(0, 6),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
-
-		-- 1. TOP ROW (LayoutOrder 1): Balanced Coin & Luck Cards
 		TopRow = React.createElement("Frame", {
 			LayoutOrder = 1,
 			Size = UDim2.new(1, 0, 0.44, 0),
@@ -93,417 +225,26 @@ local function StatsHUD(props: Props): any
 		}, {
 			HLayout = React.createElement("UIListLayout", {
 				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
 				Padding = UDim.new(0, 6),
 			}),
-
-			-- 1A. 3D Glossy Coin Card (50% Width)
-			CoinCard = React.createElement("Frame", {
-				Size = UDim2.new(0.5, -3, 1, 0),
-				BackgroundTransparency = 1,
-			}, {
-				-- Shadow Layer (Bottom)
-				Shadow = React.createElement("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.58),
-					Size = UDim2.fromScale(1, 0.90),
-					BackgroundColor3 = Color3.fromRGB(18, 14, 6),
-					BorderSizePixel = 0,
-					ZIndex = 1,
-				}, {
-					Corner = React.createElement("UICorner", {
-						CornerRadius = UDim.new(0, 6),
-					}),
-				}),
-
-				-- Top Face Surface Layer
-				Face = React.createElement("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.44),
-					Size = UDim2.fromScale(1, 0.90),
-					BackgroundColor3 = Color3.fromRGB(38, 28, 12),
-					BorderSizePixel = 0,
-					ClipsDescendants = true,
-					ZIndex = 2,
-				}, {
-					Corner = React.createElement("UICorner", {
-						CornerRadius = UDim.new(0, 6),
-					}),
-					Stroke = React.createElement("UIStroke", {
-						Color = Color3.fromRGB(241, 196, 15),
-						Thickness = 1.2,
-						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					}),
-
-					-- Glossy Shine Overlay
-					Shine = React.createElement("Frame", {
-						Position = UDim2.fromScale(0, 0),
-						Size = UDim2.new(1, 0, 0.45, 0),
-						BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-						BorderSizePixel = 0,
-						ZIndex = 3,
-					}, {
-						Corner = React.createElement("UICorner", {
-							CornerRadius = UDim.new(0, 6),
-						}),
-						Gradient = React.createElement("UIGradient", {
-							Rotation = 90,
-							Transparency = NumberSequence.new({
-								NumberSequenceKeypoint.new(0, 0.25),
-								NumberSequenceKeypoint.new(1, 0.90),
-							}),
-						}),
-					}),
-
-					-- Coin Icon
-					CoinIcon = React.createElement("TextLabel", {
-						AnchorPoint = Vector2.new(0, 0.5),
-						Position = UDim2.fromScale(0.06, 0.5),
-						Size = UDim2.fromScale(0.24, 0.85),
-						BackgroundTransparency = 1,
-						Font = Enum.Font.FredokaOne,
-						Text = "🪙",
-						TextScaled = true,
-						ZIndex = 4,
-					}),
-
-					-- Coin Value
-					CoinValue = React.createElement("TextLabel", {
-						AnchorPoint = Vector2.new(0, 0.5),
-						Position = UDim2.fromScale(0.32, 0.5),
-						Size = UDim2.fromScale(0.62, 0.85),
-						BackgroundTransparency = 1,
-						Font = Enum.Font.FredokaOne,
-						Text = FormatNumber(props.coins or 0),
-						TextColor3 = Color3.fromRGB(255, 220, 50),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextScaled = true,
-						ZIndex = 4,
-					}, {
-						Stroke = React.createElement("UIStroke", {
-							Color = Color3.fromRGB(0, 0, 0),
-							Thickness = 1.2,
-							LineJoinMode = Enum.LineJoinMode.Round,
-						}),
-					}),
-				}),
+			Coin = React.createElement(StatCard, {
+				icon = THEME.Icons.Coin,
+				text = FormatNumber(props.coins or 0),
+				theme = THEME.Coin,
 			}),
-
-			-- 1B. 3D Glossy Luck Card (50% Width)
-			LuckCard = React.createElement("Frame", {
-				Size = UDim2.new(0.5, -3, 1, 0),
-				BackgroundTransparency = 1,
-			}, {
-				-- Shadow Layer (Bottom)
-				Shadow = React.createElement("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.58),
-					Size = UDim2.fromScale(1, 0.90),
-					BackgroundColor3 = Color3.fromRGB(8, 20, 12),
-					BorderSizePixel = 0,
-					ZIndex = 1,
-				}, {
-					Corner = React.createElement("UICorner", {
-						CornerRadius = UDim.new(0, 6),
-					}),
-				}),
-
-				-- Top Face Surface Layer
-				Face = React.createElement("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.44),
-					Size = UDim2.fromScale(1, 0.90),
-					BackgroundColor3 = Color3.fromRGB(16, 40, 24),
-					BorderSizePixel = 0,
-					ClipsDescendants = true,
-					ZIndex = 2,
-				}, {
-					Corner = React.createElement("UICorner", {
-						CornerRadius = UDim.new(0, 6),
-					}),
-					Stroke = React.createElement("UIStroke", {
-						Color = Color3.fromRGB(46, 204, 113),
-						Thickness = 1.2,
-						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					}),
-
-					-- Glossy Shine Overlay
-					Shine = React.createElement("Frame", {
-						Position = UDim2.fromScale(0, 0),
-						Size = UDim2.new(1, 0, 0.45, 0),
-						BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-						BorderSizePixel = 0,
-						ZIndex = 3,
-					}, {
-						Corner = React.createElement("UICorner", {
-							CornerRadius = UDim.new(0, 6),
-						}),
-						Gradient = React.createElement("UIGradient", {
-							Rotation = 90,
-							Transparency = NumberSequence.new({
-								NumberSequenceKeypoint.new(0, 0.25),
-								NumberSequenceKeypoint.new(1, 0.90),
-							}),
-						}),
-					}),
-
-					-- Luck Icon
-					LuckIcon = React.createElement("TextLabel", {
-						AnchorPoint = Vector2.new(0, 0.5),
-						Position = UDim2.fromScale(0.06, 0.5),
-						Size = UDim2.fromScale(0.24, 0.85),
-						BackgroundTransparency = 1,
-						Font = Enum.Font.FredokaOne,
-						Text = "🍀",
-						TextScaled = true,
-						ZIndex = 4,
-					}),
-
-					-- Luck Value
-					LuckValue = React.createElement("TextLabel", {
-						AnchorPoint = Vector2.new(0, 0.5),
-						Position = UDim2.fromScale(0.32, 0.5),
-						Size = UDim2.fromScale(0.62, 0.85),
-						BackgroundTransparency = 1,
-						Font = Enum.Font.FredokaOne,
-						Text = string.format("%d%%", totalLuckDisplay),
-						TextColor3 = Color3.fromRGB(80, 240, 140),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextScaled = true,
-						ZIndex = 4,
-					}, {
-						Stroke = React.createElement("UIStroke", {
-							Color = Color3.fromRGB(0, 0, 0),
-							Thickness = 1.2,
-							LineJoinMode = Enum.LineJoinMode.Round,
-						}),
-					}),
-				}),
+			Luck = React.createElement(StatCard, {
+				icon = THEME.Icons.Luck,
+				text = string.format("%d%%", math.floor(props.luckMultiplier * 100 + 0.5)),
+				theme = THEME.Luck,
 			}),
 		}),
-
-		-- 2. BOTTOM ROW (LayoutOrder 2): Left Level Box (ZIndex 2) + Underlapping Right Track Tube (ZIndex 1 / -z1)
-		BottomRow = React.createElement("Frame", {
-			LayoutOrder = 2,
-			Size = UDim2.new(1, 0, 0.50, 0),
-			BackgroundTransparency = 1,
-		}, {
-			-- 2A. Kontainer Bar Level di Kanan (Nyambung ke kontainer hijau di belakang / -z1)
-			TrackContainer = React.createElement("Frame", {
-				AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 44, 0.5, 0),
-				Size = UDim2.new(1, -44, 0.76, 0),
-				BackgroundColor3 = Color3.fromRGB(20, 26, 36),
-				BorderSizePixel = 0,
-				ZIndex = 1,
-			}, {
-				Corner = React.createElement("UICorner", {
-					CornerRadius = UDim.new(1, 0),
-				}),
-				Stroke = React.createElement("UIStroke", {
-					Color = Color3.fromRGB(10, 14, 20),
-					Thickness = 2.5,
-					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-				}),
-
-				-- Top Rim Specular Lens Gleam
-				TopFlare = React.createElement("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0),
-					Position = UDim2.fromScale(0.38, 0),
-					Size = UDim2.new(0.28, 0, 0, 3),
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-					BorderSizePixel = 0,
-					ZIndex = 8,
-				}, {
-					Corner = React.createElement("UICorner", {
-						CornerRadius = UDim.new(1, 0),
-					}),
-					Gradient = React.createElement("UIGradient", {
-						Transparency = NumberSequence.new({
-							NumberSequenceKeypoint.new(0, 1),
-							NumberSequenceKeypoint.new(0.5, 0.25),
-							NumberSequenceKeypoint.new(1, 1),
-						}),
-					}),
-				}),
-
-				-- Hollow Dark Recessed Bed
-				TrackBed = React.createElement("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.new(1, -6, 1, -6),
-					BackgroundColor3 = Color3.fromRGB(12, 16, 22),
-					BorderSizePixel = 0,
-					ClipsDescendants = true,
-					ZIndex = 2,
-				}, {
-					Corner = React.createElement("UICorner", {
-						CornerRadius = UDim.new(1, 0),
-					}),
-
-					-- Cyan Glass Capsule Progress Fill
-					ExpFill = React.createElement("Frame", {
-						Size = UDim2.new(displayRatio, 0, 1, 0),
-						BackgroundColor3 = Color3.fromRGB(0, 210, 255),
-						BorderSizePixel = 0,
-						ClipsDescendants = true,
-						ZIndex = 2,
-					}, {
-						Corner = React.createElement("UICorner", {
-							CornerRadius = UDim.new(1, 0),
-						}),
-						FillGradient = React.createElement("UIGradient", {
-							Color = ColorSequence.new({
-								ColorSequenceKeypoint.new(0, Color3.fromHex("45F6FF")),
-								ColorSequenceKeypoint.new(0.35, Color3.fromHex("00D2FF")),
-								ColorSequenceKeypoint.new(1, Color3.fromHex("0088DD")),
-							}),
-						}),
-
-						-- Upper Glass Gloss Capsule Highlight
-						GlassGloss = React.createElement("Frame", {
-							Position = UDim2.fromScale(0, 0),
-							Size = UDim2.new(1, 0, 0.50, 0),
-							BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-							BorderSizePixel = 0,
-							ZIndex = 3,
-						}, {
-							Corner = React.createElement("UICorner", {
-								CornerRadius = UDim.new(1, 0),
-							}),
-							Gradient = React.createElement("UIGradient", {
-								Rotation = 90,
-								Transparency = NumberSequence.new({
-									NumberSequenceKeypoint.new(0, 0.12),
-									NumberSequenceKeypoint.new(1, 0.82),
-								}),
-							}),
-						}),
-					}),
-
-					-- EXP Label Text ("262 / 579")
-					ExpLabel = React.createElement("TextLabel", {
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.fromScale(0.56, 0.5),
-						Size = UDim2.fromScale(0.78, 0.75),
-						BackgroundTransparency = 1,
-						Font = Enum.Font.FredokaOne,
-						Text = string.format("%d / %d", math.floor(displayExp), math.max(1, props.requiredExp or 100)),
-						TextColor3 = Color3.fromRGB(255, 255, 255),
-						TextScaled = true,
-						ZIndex = 4,
-					}, {
-						Stroke = React.createElement("UIStroke", {
-							Color = Color3.fromRGB(0, 0, 0),
-							Thickness = 1.4,
-							LineJoinMode = Enum.LineJoinMode.Round,
-						}),
-					}),
-				}),
-			}),
-
-			-- 2B. Kotak Hijau di Kiri yang Dibalut ke Dalam Kontainer (ZIndex 2 / di atas track tube)
-			LevelBoxContainer = React.createElement("Frame", {
-				AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 0, 0.5, 0),
-				Size = UDim2.new(0, 58, 1, 0),
-				BackgroundColor3 = Color3.fromRGB(22, 28, 38),
-				BorderSizePixel = 0,
-				ZIndex = 2,
-			}, {
-				Corner = React.createElement("UICorner", {
-					CornerRadius = UDim.new(0, 8),
-				}),
-				Stroke = React.createElement("UIStroke", {
-					Color = Color3.fromRGB(10, 14, 20),
-					Thickness = 2.5,
-					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-				}),
-
-				-- 3D Green Bottom Shadow Layer (Di dalam kontainer hitam)
-				BadgeShadow = React.createElement("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.58),
-					Size = UDim2.new(1, -6, 1, -6),
-					BackgroundColor3 = Color3.fromRGB(42, 92, 10),
-					BorderSizePixel = 0,
-					ZIndex = 1,
-				}, {
-					Corner = React.createElement("UICorner", {
-						CornerRadius = UDim.new(0, 6),
-					}),
-				}),
-
-				-- 3D Green Elevated Face (Di dalam kontainer hitam)
-				BadgeFace = React.createElement("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.44),
-					Size = UDim2.new(1, -6, 1, -6),
-					BackgroundColor3 = Color3.fromRGB(148, 235, 25),
-					BorderSizePixel = 0,
-					ClipsDescendants = true,
-					ZIndex = 2,
-				}, {
-					Corner = React.createElement("UICorner", {
-						CornerRadius = UDim.new(0, 6),
-					}),
-					Stroke = React.createElement("UIStroke", {
-						Color = Color3.fromRGB(35, 75, 8),
-						Thickness = 1.2,
-						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					}),
-					Gradient = React.createElement("UIGradient", {
-						Rotation = 90,
-						Color = ColorSequence.new({
-							ColorSequenceKeypoint.new(0, Color3.fromHex("B8FA24")),
-							ColorSequenceKeypoint.new(0.35, Color3.fromHex("9CE81C")),
-							ColorSequenceKeypoint.new(1, Color3.fromHex("68C810")),
-						}),
-					}),
-
-					-- Specular Top Shine
-					BadgeShine = React.createElement("Frame", {
-						Position = UDim2.fromScale(0, 0),
-						Size = UDim2.new(1, 0, 0.45, 0),
-						BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-						BorderSizePixel = 0,
-						ZIndex = 3,
-					}, {
-						Corner = React.createElement("UICorner", {
-							CornerRadius = UDim.new(0, 5),
-						}),
-						Gradient = React.createElement("UIGradient", {
-							Rotation = 90,
-							Transparency = NumberSequence.new({
-								NumberSequenceKeypoint.new(0, 0.18),
-								NumberSequenceKeypoint.new(1, 0.85),
-							}),
-						}),
-					}),
-
-					-- Level Text ("LV. 3")
-					LevelText = React.createElement("TextLabel", {
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.fromScale(0.5, 0.5),
-						Size = UDim2.fromScale(0.92, 0.82),
-						BackgroundTransparency = 1,
-						Font = Enum.Font.FredokaOne,
-						Text = string.format("LV. %d", props.level or 1),
-						TextColor3 = Color3.fromRGB(255, 255, 255),
-						TextScaled = true,
-						ZIndex = 4,
-					}, {
-						TextStroke = React.createElement("UIStroke", {
-							Color = Color3.fromRGB(12, 18, 8),
-							Thickness = 2.0,
-							LineJoinMode = Enum.LineJoinMode.Round,
-						}),
-					}),
-				}),
-			}),
+		BottomRow = React.createElement(ExpTubeBar, {
+			level = props.level or 1,
+			exp = displayExp,
+			requiredExp = props.requiredExp or 100,
+			ratio = displayRatio,
 		}),
 	})
 end
-
 
 return StatsHUD

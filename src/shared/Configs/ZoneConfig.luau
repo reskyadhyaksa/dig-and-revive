@@ -45,32 +45,9 @@ local ZoneConfigs: { [string]: ZoneConfig } = {
 	},
 }
 
-local ZoneConfigModule = {
+local ZoneConfig = {
 	Zones = ZoneConfigs,
 	Materials = MaterialConfigs,
 }
 
-function ZoneConfigModule.GetZoneConfig(zoneId: string): ZoneConfig?
-	return ZoneConfigs[zoneId]
-end
-
-function ZoneConfigModule.GetMaterialConfig(material: Enum.Material): MaterialConfig?
-	return MaterialConfigs[material]
-end
-
-function ZoneConfigModule.IsMaterialDiggableInZone(zoneId: string, material: Enum.Material): boolean
-	local zone = ZoneConfigs[zoneId]
-	if not zone then
-		return false
-	end
-
-	for _, allowedMaterial in zone.allowedMaterials do
-		if allowedMaterial == material then
-			return true
-		end
-	end
-
-	return false
-end
-
-return table.freeze(ZoneConfigModule)
+return table.freeze(ZoneConfig)

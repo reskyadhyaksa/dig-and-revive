@@ -2,13 +2,11 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Trove = require(Packages:WaitForChild("Trove"))
+local Trove = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Trove"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local LevelConfig = require(Shared:WaitForChild("Configs"):WaitForChild("LevelConfig"))
-local ShovelConfig = require(Shared:WaitForChild("Configs"):WaitForChild("ShovelConfig"))
+local LevelUtils = require(Shared:WaitForChild("Utils"):WaitForChild("LevelUtils"))
+local ShovelUtils = require(Shared:WaitForChild("Utils"):WaitForChild("ShovelUtils"))
 local LevelTypes = require(Shared:WaitForChild("Types"):WaitForChild("LevelTypes"))
 local ShovelTypes = require(Shared:WaitForChild("Types"):WaitForChild("ShovelTypes"))
 local DigNetwork = require(script.Parent.Parent:WaitForChild("Network"):WaitForChild("DigNetwork"))
@@ -18,127 +16,77 @@ type ExpRewardResult = LevelTypes.ExpRewardResult
 type ShovelConfigType = ShovelTypes.ShovelConfig
 
 local PlayerService = {}
-PlayerService.__index = PlayerService
-
-local _serviceTrove = Trove.new()
+local _trove = Trove.new()
 
 function PlayerService.Init()
-	_serviceTrove:Connect(Players.PlayerAdded, function(player: Player)
-		PlayerService._OnPlayerAdded(player)
+	_trove:Connect(Players.PlayerAdded, function(p)
+		if PlayerProfileStore.LoadProfile(p) then PlayerService.SyncPlayerStats(p) end
 	end)
-
-	_serviceTrove:Connect(Players.PlayerRemoving, function(player: Player)
-		PlayerService._OnPlayerRemoving(player)
+	_trove:Connect(Players.PlayerRemoving, function(p)
+		PlayerProfileStore.ReleaseProfile(p)
 	end)
-
-	for _, player in Players:GetPlayers() do
+	for _, p in Players:GetPlayers() do
 		task.spawn(function()
-			PlayerService._OnPlayerAdded(player)
+			if PlayerProfileStore.LoadProfile(p) then PlayerService.SyncPlayerStats(p) end
 		end)
 	end
 end
 
-function PlayerService._OnPlayerAdded(player: Player)
-	local profileData = PlayerProfileStore.LoadProfile(player)
-	if profileData ~= nil then
-		PlayerService.SyncPlayerStats(player)
-	end
-end
-
-function PlayerService._OnPlayerRemoving(player: Player)
-	PlayerProfileStore.ReleaseProfile(player)
-end
-
-function PlayerService.GetPlayerLevel(player: Player): number
-	local data = PlayerProfileStore.GetProfileData(player)
+function PlayerService.GetPlayerLevel(p: Player): number
+	local data = PlayerProfileStore.GetProfileData(p)
 	return if data then data.level else 1
 end
 
-function PlayerService.GetPlayerExp(player: Player): number
-	local data = PlayerProfileStore.GetProfileData(player)
+function PlayerService.GetPlayerExp(p: Player): number
+	local data = PlayerProfileStore.GetProfileData(p)
 	return if data then data.exp else 0
 end
 
-function PlayerService.GetCoins(player: Player): number
-	return PlayerProfileStore.GetCoins(player)
+function PlayerService.GetCoins(p: Player): number
+	return PlayerProfileStore.GetCoins(p)
 end
 
-function PlayerService.GetLevelLuck(player: Player): number
-	local level = PlayerService.GetPlayerLevel(player)
-	return LevelConfig.GetLevelLuckMultiplier(level)
-end
-
-function PlayerService.GetEquippedShovelConfig(player: Player): ShovelConfigType?
-	local char = player.Character
-	if char then
-		local tool = char:FindFirstChildWhichIsA("Tool")
-		if tool then
-			local cfg = ShovelConfig.GetShovelConfig(tool.Name)
-			if cfg then return cfg end
-		end
+function PlayerService.GetEquippedShovelConfig(p: Player): ShovelConfigType?
+	local function checkTool(container: Instance?): ShovelConfigType?
+		if not container then return nil end
+		local tool = container:FindFirstChildWhichIsA("Tool")
+		return if tool then ShovelUtils.GetShovelConfig(tool.Name) else nil
 	end
-
-	local backpack = player:FindFirstChildOfClass("Backpack")
-	if backpack then
-		local tool = backpack:FindFirstChildWhichIsA("Tool")
-		if tool then
-			local cfg = ShovelConfig.GetShovelConfig(tool.Name)
-			if cfg then return cfg end
-		end
-	end
-
-	return ShovelConfig.GetStarterShovel()
+	return checkTool(p.Character) or checkTool(p:FindFirstChildOfClass("Backpack")) or ShovelUtils.GetStarterShovel()
 end
 
-function PlayerService.GetTotalPlayerLuck(player: Player): number
-	local level = PlayerService.GetPlayerLevel(player)
-	local levelMultiplier = LevelConfig.GetLevelLuckMultiplier(level)
-	local shovelCfg = PlayerService.GetEquippedShovelConfig(player)
-	local shovelBonus = if shovelCfg then (shovelCfg.luckBonus or 0) else 0
-	return levelMultiplier + (shovelBonus / 100)
+function PlayerService.GetTotalPlayerLuck(p: Player): number
+	local levelMult = LevelUtils.GetLevelLuckMultiplier(PlayerService.GetPlayerLevel(p))
+	local shovelCfg = PlayerService.GetEquippedShovelConfig(p)
+	local bonus = if shovelCfg then (shovelCfg.luckBonus or 0) else 0
+	return levelMult + (bonus / 100)
 end
 
-function PlayerService.AddExp(player: Player, amount: number): ExpRewardResult
-	local currentLevel = PlayerService.GetPlayerLevel(player)
-	local currentExp = PlayerService.GetPlayerExp(player)
-
-	local result = LevelConfig.CalculateExpGain(currentLevel, currentExp, amount)
-	PlayerProfileStore.SetLevelAndExp(player, result.newLevel, result.newExp)
-
-	PlayerService.SyncPlayerStats(player)
-
+function PlayerService.AddExp(p: Player, amount: number): ExpRewardResult
+	local result = LevelUtils.CalculateExpGain(PlayerService.GetPlayerLevel(p), PlayerService.GetPlayerExp(p), amount)
+	PlayerProfileStore.SetLevelAndExp(p, result.newLevel, result.newExp)
+	PlayerService.SyncPlayerStats(p)
 	return result
 end
 
-function PlayerService.AddCoins(player: Player, amount: number): number
-	local newTotal = PlayerProfileStore.AddCoins(player, amount)
-	PlayerService.SyncPlayerStats(player)
-	return newTotal
+function PlayerService.AddCoins(p: Player, amount: number): number
+	local total = PlayerProfileStore.AddCoins(p, amount)
+	PlayerService.SyncPlayerStats(p)
+	return total
 end
 
-function PlayerService.SyncPlayerStats(player: Player)
-	local data = PlayerProfileStore.GetProfileData(player)
+function PlayerService.SyncPlayerStats(p: Player)
+	local data = PlayerProfileStore.GetProfileData(p)
 	if not data then return end
-
-	local requiredExp = LevelConfig.GetRequiredExp(data.level)
-	local totalLuckMultiplier = PlayerService.GetTotalPlayerLuck(player)
-	local coins = data.coins or 0
-
-	player:SetAttribute("Level", data.level)
-	player:SetAttribute("Coins", coins)
-
-	DigNetwork.PlayerStatsSync.fire(
-		player,
-		data.level,
-		data.exp,
-		requiredExp,
-		coins,
-		totalLuckMultiplier
-	)
+	local requiredExp = LevelUtils.GetRequiredExp(data.level)
+	local luck = PlayerService.GetTotalPlayerLuck(p)
+	p:SetAttribute("Level", data.level)
+	p:SetAttribute("Coins", data.coins or 0)
+	DigNetwork.PlayerStatsSync.fire(p, data.level, data.exp, requiredExp, data.coins or 0, luck)
 end
 
 function PlayerService.Destroy()
-	_serviceTrove:Clean()
+	_trove:Clean()
 end
 
 return PlayerService
