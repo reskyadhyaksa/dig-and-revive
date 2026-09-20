@@ -1,16 +1,25 @@
 ---
-trigger: manual
+trigger: always_on
 ---
 
 # 🤖 AI Assistant Rules for Roblox Project (GEMINI.md)
 
-You are an expert Roblox Lua/Luau software engineer. When generating, modifying, or reviewing code for this project, you MUST strictly adhere to the following architectural pillars, rules, and best practices.
+You are an expert Roblox Lua/Luau software engineer. When generating, modifying, or reviewing code for this project, you MUST strictly adhere to the following architectural pillars, rules, and best practices. All of client return is purely with english language
 
 ## 🛑 AI Context & File Reading Constraints
 - **IGNORE LARGE DIRECTORIES:** **DO NOT** read, scan, index, or analyze dependency folders such as `Packages`, `ServerPackages`, `Index`, or `node_modules`. These contain massive auto-generated Wally/npm packages. 
 - Assume standard behaviors for the approved libraries (ProfileService, Trove, React-Luau, etc.) based on their official documentation. Only analyze the actual source code (`src/` or `lib/`) written by the developer.
 
 ---
+
+## 🚫 0. THE PRIME DIRECTIVE: ANTI-MONOLITH (HARD CEILING)
+* **Maximum Line Limit:** **STRICT 100-120 LINES PER FILE.** No exceptions.
+* **Single Responsibility Only:** A file does ONE thing:
+  * Markup is purely markup (`*View.luau`).
+  * Logic is purely logic (`use*.luau`, `*Utils.luau`).
+  * Configuration is purely data (`*Config.luau`).
+* If any component or helper approaches the limit: **STOP AND DECOMPOSE INTO SUB-MODULES IMMEDIATELY.**
+* **Package Quarantine:** **NEVER** scan, read, or index `Packages/`, `ServerPackages/`, or `Index/`.
 
 ## 🏗️ 1. Core Architecture & Tech Stack
 This project uses a modern Roblox toolchain (Rojo, Wally) with a strict layered architecture:
@@ -51,13 +60,12 @@ Follow the **Controller-Service-Repository** pattern. Never mix network, busines
   - NEVER use `:Remove()` or `Parent = nil`. Always use `:Destroy()`.
 
 ## 🎨 6. Strict UI Architecture & Procedural 3D Styling System
-
 ### A. Mobile-First Responsive Breakpoint Philosophy
 - **Viewport Agnostic First (Mobile Dominant):** All UI sizing and layouts must be designed and verified for narrow mobile viewports prior to adapting to tablet, console, or desktop displays.
 - **Scale over Offset (with Strict Boundary Constraints):**
   - Use **Scale** for relative layout framing, paired strictly with `UIAspectRatioConstraint` to prevent geometric distortion across dynamic aspect ratios.
   - Use **Offset** exclusively for tactile bevel depth, shadow displacements, and pixel-crisp borders.
-  - Enforce `UISizeConstraint` with `MinSize` (minimum tap target area of `44x44` px for mobile ergonomics) and `MaxSize` (preventing visual ballooning on 1440p/4K PC displays).
+  - Apply **Conditional Device-Based Sizing** via device detection hooks (e.g., `local isMobile = useDeviceType().isMobile`) to tailor base dimensions contextually (e.g., `Size = if isMobile then UDim2.fromScale(0.5, 0.5) else UDim2.fromScale(0.75, 0.75)`), ensuring interactive tap targets preserve a minimum `44x44` px footprint on mobile.
 - **Reactive Breakpoint Context Hook:**
   - Consume a centralized viewport observer (`useDeviceBreakpoint()` or `Camera:GetPropertyChangedSignal("ViewportSize")`) that emits distinct device tiers:
     * `Compact` (`ViewportSize.X < 700`)

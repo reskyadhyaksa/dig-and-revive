@@ -43,18 +43,25 @@ local function EnsureStarterShovel(player: Player, character: Model, config: Sho
 	if not backpack then return end
 	if backpack:FindFirstChild(config.assetName) or character:FindFirstChild(config.assetName) then return end
 
-	local asset = ShovelHolsterHelper.GetShovelAsset(config.assetName)
-	if asset then
-		local clone = asset:Clone()
-		clone:SetAttribute("ShovelId", config.id)
-		clone.Parent = backpack
+	local tool = ShovelHolsterHelper.GetOrCreateShovelAsset(config)
+	tool:SetAttribute("ShovelId", config.id)
+	tool.Parent = backpack
+
+	local starterGear = player:FindFirstChild("StarterGear")
+	if starterGear and not starterGear:FindFirstChild(config.assetName) then
+		local sgTool = ShovelHolsterHelper.GetOrCreateShovelAsset(config)
+		sgTool:SetAttribute("ShovelId", config.id)
+		sgTool.Parent = starterGear
 	end
 end
 
 function ShovelService.Init()
 	_trove:Connect(Players.PlayerAdded, function(p) ShovelService._OnPlayerAdded(p) end)
 	_trove:Connect(Players.PlayerRemoving, function(p)
-		if _playerTroves[p] then _playerTroves[p]:Clean() _playerTroves[p] = nil end
+		if _playerTroves[p] then
+			_playerTroves[p]:Clean()
+			_playerTroves[p] = nil
+		end
 	end)
 	for _, p in Players:GetPlayers() do task.spawn(function() ShovelService._OnPlayerAdded(p) end) end
 end

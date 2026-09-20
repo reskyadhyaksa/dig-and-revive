@@ -49,19 +49,20 @@ function UIBuilder.LinearGradient(colors: { Color3 }, rotation: number?, transpa
 	})
 end
 
-function UIBuilder.ShineOverlay(radius: number?, heightRatio: number?, maxTransparency: number?)
+function UIBuilder.ShineOverlay(radius: number?, heightRatio: number?, maxTransparency: number?, zIndex: number?, tintColor: Color3?)
+	local baseColor = if tintColor then tintColor:Lerp(Color3.fromRGB(255, 255, 255), 0.30) else Color3.fromRGB(255, 255, 255)
 	return React.createElement("Frame", {
 		Position = UDim2.fromScale(0, 0),
 		Size = UDim2.new(1, 0, heightRatio or 0.45, 0),
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundColor3 = baseColor,
 		BorderSizePixel = 0,
-		ZIndex = 3,
+		ZIndex = zIndex or 1,
 	}, {
 		Corner = if radius then UIBuilder.Corner(radius) else UIBuilder.PillCorner(),
 		Gradient = React.createElement("UIGradient", {
 			Rotation = 90,
 			Transparency = NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 0.15),
+				NumberSequenceKeypoint.new(0, 0.12),
 				NumberSequenceKeypoint.new(1, maxTransparency or 0.85),
 			}),
 		}),
@@ -73,7 +74,9 @@ function UIBuilder.BevelPlate(props: {
 	position: UDim2?,
 	anchorPoint: Vector2?,
 	shadowColor: Color3,
+	shadowYScale: number?,
 	faceColor: Color3,
+	faceYScale: number?,
 	gradientColors: { Color3 }?,
 	borderColor: Color3?,
 	borderThickness: number?,
@@ -91,11 +94,9 @@ function UIBuilder.BevelPlate(props: {
 	if props.borderColor then
 		faceChildren.Stroke = UIBuilder.Stroke(props.borderColor, props.borderThickness or 1.4)
 	end
-
 	if props.gradientColors then
 		faceChildren.Gradient = UIBuilder.LinearGradient(props.gradientColors, 90)
 	end
-
 	if props.children then
 		for k, v in pairs(props.children) do
 			faceChildren[k] = v
@@ -111,19 +112,17 @@ function UIBuilder.BevelPlate(props: {
 	}, {
 		Shadow = React.createElement("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.58),
-			Size = UDim2.fromScale(1, 0.90),
+			Position = UDim2.fromScale(0.5, props.shadowYScale or 0.53),
+			Size = UDim2.fromScale(1, 0.92),
 			BackgroundColor3 = props.shadowColor,
 			BorderSizePixel = 0,
 			ZIndex = 1,
-		}, {
-			Corner = UIBuilder.Corner(radius),
-		}),
+		}, { Corner = UIBuilder.Corner(radius) }),
 
 		Face = React.createElement("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.44),
-			Size = UDim2.fromScale(1, 0.90),
+			Position = UDim2.fromScale(0.5, props.faceYScale or 0.47),
+			Size = UDim2.fromScale(1, 0.92),
 			BackgroundColor3 = props.faceColor,
 			BorderSizePixel = 0,
 			ClipsDescendants = if props.clipsFace ~= nil then props.clipsFace else true,

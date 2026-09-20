@@ -13,10 +13,12 @@ export type Props = UITypes.StatsHUDProps
 -- 🎨 THEME & DIMENSION CONFIG
 local THEME = {
 	Container = {
-		MobileSize = UDim2.fromScale(0.32, 0.12),
-		DesktopSize = UDim2.fromScale(0.21, 0.10),
+		MobileSize = UDim2.fromScale(0.25, 0.12),
+		DesktopSize = UDim2.fromScale(0.25, 0.10),
 		MinSize = Vector2.new(190, 56),
 		MaxSize = Vector2.new(280, 68),
+		MobileMinSize = Vector2.new(190, 56) * 0.9,
+		MobileMaxSize = Vector2.new(280, 68) * 0.8,
 	},
 	Icons = {
 		Coin = "rbxassetid://122992611665292",
@@ -51,8 +53,12 @@ local THEME = {
 
 local function FormatNumber(num: number): string
 	local n = math.floor(num or 0)
-	if n >= 1000000 then return string.format("%.1fM", n / 1000000) end
-	if n >= 1000 then return string.format("%.1fK", n / 1000) end
+	if n >= 1000000 then
+		return string.format("%.1fM", n / 1000000)
+	end
+	if n >= 1000 then
+		return string.format("%.1fK", n / 1000)
+	end
 	return tostring(n)
 end
 
@@ -95,8 +101,8 @@ local function StatCard(props: { icon: string, text: string, theme: typeof(THEME
 	})
 end
 
--- 🧩 Level Box + Capsule Track
 local function ExpTubeBar(props: { level: number, exp: number, requiredExp: number, ratio: number })
+	local isMobile = useDeviceType().isMobile
 	local theme = THEME.Exp
 	return React.createElement("Frame", {
 		LayoutOrder = 2,
@@ -107,7 +113,7 @@ local function ExpTubeBar(props: { level: number, exp: number, requiredExp: numb
 		Track = React.createElement("Frame", {
 			AnchorPoint = Vector2.new(0, 0.5),
 			Position = UDim2.new(0, 44, 0.5, 0),
-			Size = UDim2.new(1, -44, 0.76, 0),
+			Size = UDim2.new(1, -44, 0.75, 0),
 			BackgroundColor3 = theme.ChassisBg,
 			BorderSizePixel = 0,
 			ZIndex = 1,
@@ -138,14 +144,14 @@ local function ExpTubeBar(props: { level: number, exp: number, requiredExp: numb
 				Label = React.createElement("TextLabel", {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					Position = UDim2.fromScale(0.56, 0.5),
-					Size = UDim2.fromScale(0.78, 0.75),
+					Size = UDim2.fromScale(1, 1.2),
 					BackgroundTransparency = 1,
 					Font = Enum.Font.FredokaOne,
 					Text = string.format("%d / %d", math.floor(props.exp), math.max(1, props.requiredExp)),
 					TextColor3 = Color3.fromRGB(255, 255, 255),
 					TextScaled = true,
 					ZIndex = 4,
-				}, { Stroke = UIBuilder.TextStroke(Color3.fromRGB(0, 0, 0), 1.4) }),
+				}, { Stroke = UIBuilder.TextStroke(Color3.fromRGB(0, 0, 0), 1) }),
 			}),
 		}),
 
@@ -153,7 +159,7 @@ local function ExpTubeBar(props: { level: number, exp: number, requiredExp: numb
 		LevelBox = React.createElement("Frame", {
 			AnchorPoint = Vector2.new(0, 0.5),
 			Position = UDim2.new(0, 0, 0.5, 0),
-			Size = UDim2.new(0, 58, 1, 0),
+			Size = if isMobile then UDim2.new(0.25, 10, 1, 0) else UDim2.new(0.1, 58, 1, 0),
 			BackgroundColor3 = theme.LevelBoxBg,
 			BorderSizePixel = 0,
 			ZIndex = 2,
@@ -180,14 +186,13 @@ local function ExpTubeBar(props: { level: number, exp: number, requiredExp: numb
 						TextColor3 = Color3.fromRGB(255, 255, 255),
 						TextScaled = true,
 						ZIndex = 4,
-					}, { Stroke = UIBuilder.TextStroke(Color3.fromRGB(12, 18, 8), 2.0) }),
+					}, { Stroke = UIBuilder.TextStroke(Color3.fromRGB(12, 18, 8), if isMobile then 1.25 else 1.3) }),
 				},
 			}),
 		}),
 	})
 end
 
--- 🚀 Root StatsHUD Component (< 45 lines!)
 local function StatsHUD(props: Props): any
 	local isMobile = useDeviceType().isMobile
 	local displayExp, setDisplayExp = React.useState(props.exp or 0)
@@ -196,10 +201,16 @@ local function StatsHUD(props: Props): any
 
 	React.useEffect(function()
 		local conn = RunService.RenderStepped:Connect(function(dt: number)
-			setDisplayRatio(function(prev) return prev + (targetRatio - prev) * math.clamp(dt * 14, 0, 1) end)
-			setDisplayExp(function(prev) return prev + (props.exp - prev) * math.clamp(dt * 12, 0, 1) end)
+			setDisplayRatio(function(prev)
+				return prev + (targetRatio - prev) * math.clamp(dt * 14, 0, 1)
+			end)
+			setDisplayExp(function(prev)
+				return prev + (props.exp - prev) * math.clamp(dt * 12, 0, 1)
+			end)
 		end)
-		return function() conn:Disconnect() end
+		return function()
+			conn:Disconnect()
+		end
 	end, { props.exp, props.requiredExp } :: { any })
 
 	return React.createElement("Frame", {
@@ -210,8 +221,8 @@ local function StatsHUD(props: Props): any
 		ZIndex = 10,
 	}, {
 		SizeConstraint = React.createElement("UISizeConstraint", {
-			MinSize = THEME.Container.MinSize,
-			MaxSize = THEME.Container.MaxSize,
+			MinSize = if isMobile then THEME.Container.MobileMinSize else THEME.Container.MinSize,
+			MaxSize = if isMobile then THEME.Container.MobileMaxSize else THEME.Container.MaxSize,
 		}),
 		ListLayout = React.createElement("UIListLayout", {
 			FillDirection = Enum.FillDirection.Vertical,
@@ -234,7 +245,7 @@ local function StatsHUD(props: Props): any
 			}),
 			Luck = React.createElement(StatCard, {
 				icon = THEME.Icons.Luck,
-				text = string.format("%d%%", math.floor(props.luckMultiplier * 100 + 0.5)),
+				text = string.format("%d%%", math.floor((props.luckMultiplier or 1.0) * 100 + 0.5)),
 				theme = THEME.Luck,
 			}),
 		}),

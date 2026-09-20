@@ -17,6 +17,7 @@ export type DigMinigameProps = {
 	progress: number, -- 0.0 to 1.0 (digging completed percentage)
 	remainingTime: number?, -- seconds remaining in countdown
 	onSwing: (() -> ())?,
+	onCancel: (() -> ())?,
 }
 
 export type StatsHUDProps = {

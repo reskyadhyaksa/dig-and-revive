@@ -24,7 +24,7 @@ export type ZoneInfo = {
 	zoneId: string,
 	displayName: string,
 	islandId: string,
-	instance: Instance,
+	instance: Instance?,
 }
 
 return nil

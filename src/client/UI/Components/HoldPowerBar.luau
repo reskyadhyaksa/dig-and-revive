@@ -13,12 +13,13 @@ export type Props = UITypes.HoldPowerBarProps
 
 local function HoldPowerBar(props: Props): any
 	local isMobile = useDeviceType().isMobile
-	local animProgress, setAnimProgress = React.useState(0)
-	local displayPower, setDisplayPower = React.useState(0)
+	local animProgress, setAnimProgress = React.useState(if props.visible then 1 else 0)
+	local displayPower, setDisplayPower = React.useState(props.power or 0)
 
 	React.useEffect(function()
 		local targetVis = if props.visible then 1 else 0
-		local conn = RunService.RenderStepped:Connect(function(dt: number)
+		local stepSignal = if RunService:IsClient() and RunService:IsRunning() then RunService.RenderStepped else RunService.Heartbeat
+		local conn = stepSignal:Connect(function(dt: number)
 			setAnimProgress(function(p) return p + (targetVis - p) * math.clamp(dt * 14, 0, 1) end)
 			setDisplayPower(function(p) return p + (props.power - p) * math.clamp(dt * 20, 0, 1) end)
 		end)

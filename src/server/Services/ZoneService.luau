@@ -35,17 +35,28 @@ function ZoneService.RegisterZone(zoneId: string, islandId: string, container: I
 
 	local info: ZoneInfo = { zoneId = zoneId, displayName = displayName, islandId = islandId, instance = container }
 
-	zTrove:Connect(zoneInstance.playerEntered, function(p)
+	local enterConn = zoneInstance.playerEntered:Connect(function(p)
 		_playerZones[p] = info
 		ZoneService.PlayerEnteredZone:Fire(p, info)
 	end)
+	zTrove:Add(function() enterConn:Disconnect() end)
 
-	zTrove:Connect(zoneInstance.playerExited, function(p)
+	local exitConn = zoneInstance.playerExited:Connect(function(p)
 		if _playerZones[p] and _playerZones[p].zoneId == zoneId then
 			_playerZones[p] = nil
 			ZoneService.PlayerExitedZone:Fire(p, info)
 		end
 	end)
+	zTrove:Add(function() exitConn:Disconnect() end)
+
+	for _, p in Players:GetPlayers() do
+		task.spawn(function()
+			if zoneInstance:findPlayer(p) then
+				_playerZones[p] = info
+				ZoneService.PlayerEnteredZone:Fire(p, info)
+			end
+		end)
+	end
 
 	_registered[zoneId] = { info = info, instance = zoneInstance, trove = zTrove }
 end
@@ -62,7 +73,10 @@ end
 function ZoneService.Init()
 	_trove:Connect(Players.PlayerRemoving, function(p)
 		local cur = _playerZones[p]
-		if cur then _playerZones[p] = nil ZoneService.PlayerExitedZone:Fire(p, cur) end
+		if cur then
+			_playerZones[p] = nil
+			ZoneService.PlayerExitedZone:Fire(p, cur)
+		end
 	end)
 
 	local root = Workspace:FindFirstChild("Zone")
@@ -76,7 +90,18 @@ function ZoneService.Init()
 end
 
 function ZoneService.GetPlayerCurrentZone(p: Player): ZoneInfo?
-	return _playerZones[p]
+	local cur = _playerZones[p]
+	if cur then return cur end
+	if next(_registered) == nil then
+		local fallback: ZoneInfo = {
+			zoneId = "Island1_Zoning",
+			displayName = "Starter Island Dig Zone",
+			islandId = "Island1",
+			instance = nil,
+		}
+		return fallback
+	end
+	return nil
 end
 
 function ZoneService.Destroy()

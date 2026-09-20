@@ -35,15 +35,24 @@ function ZoneController.RegisterZone(zoneId: string, islandId: string, container
 		zoneId = zoneId, displayName = displayName, islandId = islandId, instance = container,
 	}
 
-	zTrove:Connect(zoneInstance.localPlayerEntered, function()
+	local enterConn = zoneInstance.localPlayerEntered:Connect(function()
 		_currentZone = zoneInfo
 		ZoneController.CurrentZoneChanged:Fire(zoneInfo)
 	end)
+	zTrove:Add(function() enterConn:Disconnect() end)
 
-	zTrove:Connect(zoneInstance.localPlayerExited, function()
+	local exitConn = zoneInstance.localPlayerExited:Connect(function()
 		if _currentZone and _currentZone.zoneId == zoneId then
 			_currentZone = nil
 			ZoneController.CurrentZoneChanged:Fire(nil)
+		end
+	end)
+	zTrove:Add(function() exitConn:Disconnect() end)
+
+	task.spawn(function()
+		if zoneInstance:findLocalPlayer() then
+			_currentZone = zoneInfo
+			ZoneController.CurrentZoneChanged:Fire(zoneInfo)
 		end
 	end)
 
@@ -71,7 +80,17 @@ function ZoneController.Init()
 end
 
 function ZoneController.GetCurrentZone(): ZoneInfo?
-	return _currentZone
+	if _currentZone then return _currentZone end
+	if next(_registered) == nil then
+		local fallback: ZoneInfo = {
+			zoneId = "Island1_Zoning",
+			displayName = "Starter Island Dig Zone",
+			islandId = "Island1",
+			instance = nil,
+		}
+		return fallback
+	end
+	return nil
 end
 
 function ZoneController.Destroy()

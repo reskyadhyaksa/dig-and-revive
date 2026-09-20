@@ -33,18 +33,19 @@ end
 
 local function CheckGround(): boolean
 	local char = LocalPlayer.Character
-	local root: BasePart? = if char then char.PrimaryPart else nil
+	local root: BasePart? = if char then (char.PrimaryPart or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")) :: BasePart? else nil
 	if not root then return false end
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { char }
-	return Workspace:Raycast(root.Position, Vector3.new(0, -6, 0), params) ~= nil
+	return Workspace:Raycast(root.Position, Vector3.new(0, -10, 0), params) ~= nil
 end
 
 function DigInputController.BindChargeInput(callbacks: {
 	onChargeStart: () -> boolean,
 	onChargeStep: (power: number) -> (),
 	onChargeEnd: (finalPower: number) -> (),
+	onTap: (() -> ())?,
 })
 	local isCharging = false
 	local renderConn: RBXScriptConnection? = nil
@@ -65,7 +66,8 @@ function DigInputController.BindChargeInput(callbacks: {
 		if not zone then return end
 		local char = LocalPlayer.Character
 		local tool = if char then char:FindFirstChildWhichIsA("Tool") else nil
-		if not tool or not ShovelUtils.GetShovelConfig(tool.Name) then return end
+		local shovelId = if tool then (tool:GetAttribute("ShovelId") or tool.Name) else nil
+		if not shovelId or not ShovelUtils.GetShovelConfig(tostring(shovelId)) then return end
 
 		if not callbacks.onChargeStart() then return end
 		isCharging = true
@@ -80,9 +82,10 @@ function DigInputController.BindChargeInput(callbacks: {
 		end)
 	end
 
-	_trove:Connect(UserInputService.InputBegan, function(input, gpe)
-		if gpe then return end
+	_trove:Connect(UserInputService.InputBegan, function(input, _gpe)
+		if UserInputService:GetFocusedTextBox() ~= nil then return end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			if callbacks.onTap then callbacks.onTap() end
 			start()
 		end
 	end)
@@ -92,6 +95,12 @@ function DigInputController.BindChargeInput(callbacks: {
 			stop()
 		end
 	end)
+
+	local function bindChar(char: Model)
+		char.ChildRemoved:Connect(function(child) if child:IsA("Tool") then stop() end end)
+	end
+	if LocalPlayer.Character then bindChar(LocalPlayer.Character) end
+	_trove:Connect(LocalPlayer.CharacterAdded, bindChar)
 end
 
 function DigInputController.Destroy()

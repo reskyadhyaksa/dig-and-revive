@@ -6,11 +6,16 @@ local ZoneNotificationBanner = require(script.Parent.Components.ZoneNotification
 local HoldPowerBar = require(script.Parent.Components.HoldPowerBar)
 local DigMinigame = require(script.Parent.Components.DigMinigame)
 local StatsHUD = require(script.Parent.Components.StatsHUD)
+local Hotbar = require(script.Parent.Components.Hotbar)
+local InventoryModal = require(script.Parent.Components.Inventory.InventoryModal)
 local DigController = require(script.Parent.Parent.Controllers.DigController)
 local useAppSignals = require(script.Parent.Hooks.useAppSignals)
+local DefaultInventoryHelper = require(script.Parent.Common.DefaultInventoryHelper)
 
 local function App(): any
 	local state = useAppSignals()
+	local invOpen, setInvOpen = React.useState(false)
+	local invTab, setInvTab = React.useState("Items")
 
 	return React.createElement("ScreenGui", {
 		ResetOnSpawn = false,
@@ -33,8 +38,8 @@ local function App(): any
 			visible = state.minigame.visible,
 			progress = state.minigame.progress,
 			remainingTime = state.minigame.remainingTime,
-			onSwing = function()
-				DigController.Swing()
+			onCancel = function()
+				DigController.CancelDig()
 			end,
 		}),
 
@@ -45,6 +50,35 @@ local function App(): any
 			coins = state.stats.coins,
 			luckMultiplier = state.stats.luckMultiplier,
 		}),
+
+		Hotbar = React.createElement(Hotbar, {
+			onSelectShovel = function()
+				if invOpen and invTab == "Shovel" then
+					setInvOpen(false)
+				else
+					setInvTab("Shovel")
+					setInvOpen(true)
+				end
+			end,
+			onOpenInventory = function()
+				if invOpen and invTab == "Items" then
+					setInvOpen(false)
+				else
+					setInvTab("Items")
+					setInvOpen(true)
+				end
+			end,
+		}),
+
+		Inventory = if invOpen then React.createElement(InventoryModal, {
+			visible = true,
+			items = DefaultInventoryHelper.GetClientShovelItems(),
+			playerLevel = state.stats.level or 1,
+			defaultTab = invTab,
+			onClose = function()
+				setInvOpen(false)
+			end,
+		}) else nil,
 	})
 end
 

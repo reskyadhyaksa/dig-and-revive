@@ -30,6 +30,9 @@ local story = {
 			visible = props.controls.visible,
 			progress = props.controls.progress,
 			remainingTime = props.controls.remainingTime,
+			onCancel = function()
+				print("[UI Labs Story] DigMinigame onCancel triggered")
+			end,
 			onSwing = function()
 				print("[UI Labs Story] DigMinigame onSwing triggered")
 			end,

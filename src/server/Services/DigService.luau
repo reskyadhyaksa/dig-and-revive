@@ -16,14 +16,8 @@ local PlayerService = require(script.Parent:WaitForChild("PlayerService"))
 
 type DropItem = DropTypes.DropItem
 type DigSession = {
-	player: Player,
-	islandId: string,
-	power: number,
-	drop: DropItem,
-	currentHp: number,
-	maxHp: number,
-	expireTime: number,
-	lastSwingTime: number,
+	player: Player, islandId: string, power: number, drop: DropItem,
+	currentHp: number, maxHp: number, expireTime: number, lastSwingTime: number,
 }
 
 local DigService = {}
@@ -51,18 +45,31 @@ function DigService.Init()
 		if not char or not char:FindFirstChildOfClass("Humanoid") then return end
 		local tool = char:FindFirstChildWhichIsA("Tool")
 		local shovelCfg = if tool then ShovelUtils.GetShovelConfig(tool.Name) else nil
-		if not shovelCfg then SendFail(p, "Tidak memegang sekop valid!") return end
+		if not shovelCfg then
+			SendFail(p, "No valid shovel equipped!")
+			return
+		end
 
 		local now = os.clock()
-		if now - (_playerLastDigEndTime[p] or 0) < shovelCfg.cooldown then SendFail(p, "Harap tunggu sebelum menggali!") return end
+		if now - (_playerLastDigEndTime[p] or 0) < shovelCfg.cooldown then
+			SendFail(p, "Please wait before digging again!")
+			return
+		end
 
 		local zone = ZoneService.GetPlayerCurrentZone(p)
-		if not zone or zone.islandId ~= islandId then SendFail(p, "Zona tidak valid!") return end
+		if not zone or zone.islandId ~= islandId then
+			SendFail(p, "Invalid zone!")
+			return
+		end
 
 		local powerMult = PowerBarHelper.GetMultiplier(math.clamp(power or 0, 0, 1))
 		local totalLuck = powerMult * PlayerService.GetTotalPlayerLuck(p)
 		local drop = DropUtils.RollDrop(zone.islandId, totalLuck)
-		if not drop then _playerLastDigEndTime[p] = now SendFail(p, "Tidak ada item ditemukan.") return end
+		if not drop then
+			_playerLastDigEndTime[p] = now
+			SendFail(p, "No item found.")
+			return
+		end
 
 		local hp = TIER_HP[drop.tier] or 3
 		_activeSessions[p] = {
@@ -79,7 +86,7 @@ function DigService.Init()
 		if now > s.expireTime then
 			_activeSessions[p] = nil
 			_playerLastDigEndTime[p] = now
-			SendFail(p, "Waktu minigame habis!")
+			SendFail(p, "Minigame time expired!")
 			return
 		end
 
