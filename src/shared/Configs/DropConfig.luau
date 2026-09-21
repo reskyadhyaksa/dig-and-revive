@@ -19,7 +19,7 @@ local Island1Drops: { DropItem } = {
 	{ id = "GolemCore", displayName = "Golem Core", tier = "Secret", islandId = "Island1", baseProbability = 750000 },
 }
 
-local DropConfig = {
+local DropConfig: { [string]: { DropItem } } = {
 	Island1 = Island1Drops,
 }
 

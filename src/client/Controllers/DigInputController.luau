@@ -41,6 +41,18 @@ local function CheckGround(): boolean
 	return Workspace:Raycast(root.Position, Vector3.new(0, -10, 0), params) ~= nil
 end
 
+local function IsPointerOverGui(pos: Vector3): boolean
+	local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if not playerGui then return false end
+	local guis = playerGui:GetGuiObjectsAtPosition(pos.X, pos.Y)
+	for _, gui in guis do
+		if gui.Visible and (gui:IsA("GuiButton") or gui.Active or gui:IsA("TextBox") or gui:IsA("ScrollingFrame")) then
+			return true
+		end
+	end
+	return false
+end
+
 function DigInputController.BindChargeInput(callbacks: {
 	onChargeStart: () -> boolean,
 	onChargeStep: (power: number) -> (),
@@ -60,8 +72,7 @@ function DigInputController.BindChargeInput(callbacks: {
 	end
 
 	local function start()
-		if isCharging then return end
-		if not CheckGround() then return end
+		if isCharging or not CheckGround() then return end
 		local zone = ZoneController.GetCurrentZone()
 		if not zone then return end
 		local char = LocalPlayer.Character
@@ -82,9 +93,10 @@ function DigInputController.BindChargeInput(callbacks: {
 		end)
 	end
 
-	_trove:Connect(UserInputService.InputBegan, function(input, _gpe)
-		if UserInputService:GetFocusedTextBox() ~= nil then return end
+	_trove:Connect(UserInputService.InputBegan, function(input, gpe)
+		if gpe or UserInputService:GetFocusedTextBox() ~= nil then return end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			if IsPointerOverGui(input.Position) then return end
 			if callbacks.onTap then callbacks.onTap() end
 			start()
 		end

@@ -1,6 +1,8 @@
 --!strict
 
-export type RarityTier = "Common" | "Uncommon" | "Epic" | "Legendary" | "Mythic" | "Secret"
+local InventoryTypes = require(script.Parent.InventoryTypes)
+
+export type RarityTier = InventoryTypes.ItemRarity
 
 export type DropItem = {
 	id: string,
@@ -8,6 +10,9 @@ export type DropItem = {
 	tier: RarityTier,
 	islandId: string,
 	baseProbability: number,
+	category: string?,
+	description: string?,
+	icon: string?,
 }
 
 export type DropResult = {

@@ -14,41 +14,32 @@ export type Props = {
 	onEquipShovel: (() -> ())?,
 	onOpenInventory: (() -> ())?,
 	onSelectShovel: (() -> ())?,
+	onOpenIndex: (() -> ())?,
 }
 
 local function ToggleShovelTool()
-	local player = Players.LocalPlayer
-	local char = if player then player.Character else nil
-	if not player or not char then return end
-
+	local p = Players.LocalPlayer
+	local char = if p then p.Character else nil
+	if not p or not char then return end
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	local tool = char:FindFirstChildWhichIsA("Tool")
 	if tool then
-		if hum then
-			hum:UnequipTools()
-		else
-			tool.Parent = player:FindFirstChildOfClass("Backpack")
-		end
+		if hum then hum:UnequipTools() else tool.Parent = p:FindFirstChildOfClass("Backpack") end
 	else
-		local bp = player:FindFirstChildOfClass("Backpack")
+		local bp = p:FindFirstChildOfClass("Backpack")
 		local bTool = if bp then bp:FindFirstChildWhichIsA("Tool") else nil
-		if bTool then
-			if hum then
-				hum:EquipTool(bTool)
-			else
-				bTool.Parent = char
-			end
-		end
+		if bTool then if hum then hum:EquipTool(bTool) else bTool.Parent = char end end
 	end
 end
 
 local function Hotbar(props: Props): any
 	local isMobile = useDeviceType().isMobile
-	local MinSize = if isMobile then Vector2.new(220, 62) else Vector2.new(200, 56)
-	local MaxSize = if isMobile then Vector2.new(352, 80) else Vector2.new(320, 72)
+	local MinSize = if isMobile then Vector2.new(280, 62) else Vector2.new(260, 56)
+	local MaxSize = if isMobile then Vector2.new(420, 80) else Vector2.new(390, 72)
 	local handleEquip = props.onEquipShovel or ToggleShovelTool
-	local handleInv = props.onOpenInventory or function() print("Opened Inventory") end
-	local handleSelect = props.onSelectShovel or function() print("Open Shovel UI") end
+	local handleInv = props.onOpenInventory or function() end
+	local handleSelect = props.onSelectShovel or function() end
+	local handleIndex = props.onOpenIndex or function() end
 
 	React.useEffect(function()
 		local conn = UserInputService.InputBegan:Connect(function(input, processed)
@@ -57,17 +48,19 @@ local function Hotbar(props: Props): any
 				handleEquip()
 			elseif input.KeyCode == Enum.KeyCode.Two then
 				handleSelect()
-			elseif input.KeyCode == Enum.KeyCode.Three or input.KeyCode == Enum.KeyCode.B or input.KeyCode == Enum.KeyCode.I then
+			elseif input.KeyCode == Enum.KeyCode.Three or input.KeyCode == Enum.KeyCode.B then
 				handleInv()
+			elseif input.KeyCode == Enum.KeyCode.Four or input.KeyCode == Enum.KeyCode.X then
+				handleIndex()
 			end
 		end)
 		return function() conn:Disconnect() end
-	end, { handleEquip, handleInv, handleSelect } :: { any })
+	end, { handleEquip, handleInv, handleSelect, handleIndex } :: { any })
 
 	return React.createElement("Frame", {
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.fromScale(0.5, 0.985),
-		Size = if isMobile then UDim2.fromScale(0.52, 0.11) else UDim2.fromScale(0.4, 0.085),
+		Size = if isMobile then UDim2.fromScale(0.65, 0.11) else UDim2.fromScale(0.48, 0.085),
 		BackgroundColor3 = Color3.fromRGB(18, 22, 30),
 		BackgroundTransparency = 1,
 		ZIndex = 10,
@@ -103,6 +96,12 @@ local function Hotbar(props: Props): any
 			keybind = if isMobile then nil else "3", faceColor = HotbarTheme.SelectShovel.faceColor,
 			gradientColors = HotbarTheme.SelectShovel.gradientColors, shadowColor = HotbarTheme.SelectShovel.shadowColor,
 			strokeColor = HotbarTheme.SelectShovel.strokeColor, onActivated = handleInv,
+		}),
+		IndexBtn = React.createElement(HotbarButton, {
+			layoutOrder = 4, icon = HotbarTheme.Index.icon, label = "Codex",
+			keybind = if isMobile then nil else "4", faceColor = HotbarTheme.Index.faceColor,
+			gradientColors = HotbarTheme.Index.gradientColors, shadowColor = HotbarTheme.Index.shadowColor,
+			strokeColor = HotbarTheme.Index.strokeColor, onActivated = handleIndex,
 		}),
 	})
 end

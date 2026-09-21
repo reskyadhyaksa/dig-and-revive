@@ -22,6 +22,13 @@ local HotbarTheme = {
 		strokeColor = Color3.fromHex("#612312"),
 		icon = "rbxassetid://100488739842115",
 	},
+	Index = {
+		faceColor = Color3.fromHex("#8EE3F5"),
+		gradientColors = { Color3.fromHex("#B5F2FD"), Color3.fromHex("#6ED4E8") },
+		shadowColor = Color3.fromHex("#1F6274"),
+		strokeColor = Color3.fromHex("#144350"),
+		icon = "rbxassetid://135832742918451",
+	},
 }
 
 return table.freeze(HotbarTheme)

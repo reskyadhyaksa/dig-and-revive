@@ -16,6 +16,8 @@ local ProfileTemplate: PlayerProfileData = {
 	level = 1,
 	exp = 0,
 	coins = 0,
+	discoveredIndex = {},
+	inventory = {},
 }
 
 local ProfileStore = ProfileService.GetProfileStore(

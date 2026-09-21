@@ -64,7 +64,7 @@ local function InventoryModal(props: Props): any
 	return React.createElement("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
 		Size = if isMobile then UDim2.fromScale(0.92, 0.88) else UDim2.fromScale(0.70, 0.72),
-		BackgroundColor3 = Color3.fromHex("#523017"), ZIndex = 30,
+		BackgroundColor3 = Color3.fromHex("#523017"), Active = true, ZIndex = 30,
 	}, {
 		Corner = UIBuilder.Corner(14), Stroke = UIBuilder.Stroke(Color3.fromHex("#3E2716"), 3.5),
 		Shine = UIBuilder.ShineOverlay(14, 0.22, 0.92, 1),

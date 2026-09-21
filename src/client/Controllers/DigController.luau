@@ -34,8 +34,8 @@ local function EndMinigame()
 	SetState("COOLDOWN")
 	_currentProgress = 0.0
 	DigController.MinigameStateChanged:Fire(false, 0, 0)
-	_cooldownUntil = os.clock() + 0.8
-	task.delay(0.8, function()
+	_cooldownUntil = os.clock() + 1.4
+	task.delay(1.4, function()
 		if GetState() == "COOLDOWN" then SetState("IDLE") end
 	end)
 end

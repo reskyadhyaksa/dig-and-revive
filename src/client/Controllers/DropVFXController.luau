@@ -2,6 +2,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local Trove = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Trove"))
@@ -23,41 +24,20 @@ local function FindDropModel(dropId: string): Model?
 	return if direct and direct:IsA("Model") then direct else nil
 end
 
-local function SetupDropParts(clone: Model, primaryPart: BasePart, char: Model): { BasePart }
-	local parts: { BasePart } = {}
-	for _, desc in clone:GetDescendants() do
-		if desc:IsA("BasePart") then
-			table.insert(parts, desc)
-			desc.Anchored = false
-			desc.CanCollide = true
-			desc.CanTouch = false
-			desc.CanQuery = false
-			if desc ~= primaryPart and not desc:FindFirstChildWhichIsA("WeldConstraint") then
-				local w = Instance.new("WeldConstraint")
-				w.Part0 = primaryPart
-				w.Part1 = desc
-				w.Parent = primaryPart
-			end
-		end
-	end
-	for _, c in char:GetDescendants() do
-		if c:IsA("BasePart") then
-			for _, p in parts do
-				local noColl = Instance.new("NoCollisionConstraint")
-				noColl.Part0 = c
-				noColl.Part1 = p
-				noColl.Parent = clone
-			end
-		end
-	end
-	return parts
+local function GetGroundPosition(char: Model): Vector3
+	local root = char.PrimaryPart or char:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then return Vector3.zero end
+	local frontPos = root.Position + (root.CFrame.LookVector * 2.8)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { char }
+	local res = Workspace:Raycast(frontPos + Vector3.new(0, 3, 0), Vector3.new(0, -10, 0), params)
+	return if res then res.Position else frontPos - Vector3.new(0, 2.5, 0)
 end
 
-function DropVFXController.PlayParabolicDrop(playerInst: Instance, dropId: string)
+function DropVFXController.PlaySurfaceRiseDrop(playerInst: Instance, dropId: string)
 	local char = if playerInst:IsA("Player") then playerInst.Character elseif playerInst:IsA("Model") then playerInst else nil
 	if not char or not char.PrimaryPart then return end
-	local root = char.PrimaryPart
-	local torso = (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso") or root) :: BasePart
 
 	local model = FindDropModel(dropId)
 	if not model then return end
@@ -67,28 +47,51 @@ function DropVFXController.PlayParabolicDrop(playerInst: Instance, dropId: strin
 	if not primary then clone:Destroy() return end
 	clone.PrimaryPart = primary
 
-	local parts = SetupDropParts(clone, primary, char)
-	local spawnPos = torso.Position - (root.CFrame.LookVector * 1.5) + Vector3.new(0, 0.8, 0)
-	clone:PivotTo(CFrame.new(spawnPos) * CFrame.Angles(0, math.rad(math.random(0, 360)), 0))
+	for _, p in clone:GetDescendants() do
+		if p:IsA("BasePart") then
+			p.Anchored = true
+			p.CanCollide = false
+			p.CanTouch = false
+			p.CanQuery = false
+		end
+	end
+
+	local groundPos = GetGroundPosition(char)
+	local initialScale = clone:GetScale()
+	clone:ScaleTo(math.max(0.01, initialScale * 0.15))
+	clone:PivotTo(CFrame.new(groundPos))
 	clone.Parent = Workspace
 
-	local spread = Vector3.new(math.random(-30, 30) / 100, 0, math.random(-30, 30) / 100)
-	local backDir = (-root.CFrame.LookVector + spread).Unit
-	primary.AssemblyLinearVelocity = (backDir * math.random(14, 22)) + Vector3.new(0, math.random(22, 32), 0)
-	primary.AssemblyAngularVelocity = Vector3.new(math.random(-25, 25), math.random(-25, 25), math.random(-25, 25))
+	local startTime = os.clock()
+	local conn: RBXScriptConnection? = nil
 
-	task.delay(5.0, function()
-		local tInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		for _, p in parts do
-			TweenService:Create(p, tInfo, { Size = Vector3.new(0.01, 0.01, 0.01), Transparency = 1 }):Play()
+	conn = RunService.RenderStepped:Connect(function()
+		local elapsed = os.clock() - startTime
+		if elapsed < 0.85 then
+			local alpha = math.clamp(elapsed / 0.85, 0, 1)
+			local easeY = TweenService:GetValue(alpha, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			local currentY = groundPos.Y + (easeY * 2.5)
+			local rotAngle = alpha * (math.pi * 4)
+			clone:PivotTo(CFrame.new(groundPos.X, currentY, groundPos.Z) * CFrame.Angles(0, rotAngle, 0))
+			clone:ScaleTo(math.max(0.01, initialScale * (0.15 + (easeY * 0.95))))
+		elseif elapsed < 1.40 then
+			local popElapsed = elapsed - 0.85
+			local popAlpha = math.clamp(popElapsed / 0.55, 0, 1)
+			local popScale = if popAlpha < 0.25 then (1.10 + ((popAlpha / 0.25) * 0.28)) else math.max(0.01, 1.38 * (1 - TweenService:GetValue((popAlpha - 0.25) / 0.75, Enum.EasingStyle.Back, Enum.EasingDirection.In)))
+			local rotAngle = (math.pi * 4) + (popAlpha * math.pi * 2)
+			local currentY = groundPos.Y + 2.5 + (math.sin(popAlpha * math.pi) * 0.35)
+			clone:PivotTo(CFrame.new(groundPos.X, currentY, groundPos.Z) * CFrame.Angles(0, rotAngle, 0))
+			clone:ScaleTo(math.max(0.01, initialScale * popScale))
+		else
+			if conn then conn:Disconnect() conn = nil end
+			clone:Destroy()
 		end
-		task.delay(1.0, function() clone:Destroy() end)
 	end)
 end
 
 function DropVFXController.Init()
 	_trove:Add(DigNetwork.DigDropVFX.on(function(p, dropId)
-		if p and dropId then DropVFXController.PlayParabolicDrop(p, dropId) end
+		if p and dropId then DropVFXController.PlaySurfaceRiseDrop(p, dropId) end
 	end))
 end
 

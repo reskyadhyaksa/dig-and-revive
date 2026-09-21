@@ -13,6 +13,8 @@ local DropTypes = require(Shared:WaitForChild("Types"):WaitForChild("DropTypes")
 local DigNetwork = require(script.Parent.Parent:WaitForChild("Network"):WaitForChild("DigNetwork"))
 local ZoneService = require(script.Parent:WaitForChild("ZoneService"))
 local PlayerService = require(script.Parent:WaitForChild("PlayerService"))
+local IndexService = require(script.Parent:WaitForChild("IndexService"))
+local InventoryRepository = require(script.Parent.Parent:WaitForChild("Repositories"):WaitForChild("InventoryRepository"))
 
 type DropItem = DropTypes.DropItem
 type DigSession = {
@@ -45,31 +47,20 @@ function DigService.Init()
 		if not char or not char:FindFirstChildOfClass("Humanoid") then return end
 		local tool = char:FindFirstChildWhichIsA("Tool")
 		local shovelCfg = if tool then ShovelUtils.GetShovelConfig(tool.Name) else nil
-		if not shovelCfg then
-			SendFail(p, "No valid shovel equipped!")
-			return
-		end
+		if not shovelCfg then SendFail(p, "No valid shovel equipped!") return end
 
 		local now = os.clock()
 		if now - (_playerLastDigEndTime[p] or 0) < shovelCfg.cooldown then
-			SendFail(p, "Please wait before digging again!")
-			return
+			SendFail(p, "Please wait before digging again!") return
 		end
 
 		local zone = ZoneService.GetPlayerCurrentZone(p)
-		if not zone or zone.islandId ~= islandId then
-			SendFail(p, "Invalid zone!")
-			return
-		end
+		if not zone or zone.islandId ~= islandId then SendFail(p, "Invalid zone!") return end
 
 		local powerMult = PowerBarHelper.GetMultiplier(math.clamp(power or 0, 0, 1))
 		local totalLuck = powerMult * PlayerService.GetTotalPlayerLuck(p)
 		local drop = DropUtils.RollDrop(zone.islandId, totalLuck)
-		if not drop then
-			_playerLastDigEndTime[p] = now
-			SendFail(p, "No item found.")
-			return
-		end
+		if not drop then _playerLastDigEndTime[p] = now SendFail(p, "No item found.") return end
 
 		local hp = TIER_HP[drop.tier] or 3
 		_activeSessions[p] = {
@@ -84,10 +75,8 @@ function DigService.Init()
 		if not s then return end
 		local now = os.clock()
 		if now > s.expireTime then
-			_activeSessions[p] = nil
-			_playerLastDigEndTime[p] = now
-			SendFail(p, "Minigame time expired!")
-			return
+			_activeSessions[p] = nil _playerLastDigEndTime[p] = now
+			SendFail(p, "Minigame time expired!") return
 		end
 
 		if now - s.lastSwingTime < 0.08 then return end
@@ -99,6 +88,8 @@ function DigService.Init()
 			local won = s.drop
 			_activeSessions[p] = nil
 			_playerLastDigEndTime[p] = now
+			InventoryRepository.AddItem(p, won, 1)
+			IndexService.RecordDiscovery(p, won.id)
 			local expRes = PlayerService.AddExp(p, LevelUtils.GetTierExp(won.tier))
 			DigNetwork.MinigameComplete.fire(p, true, won.id, 1, expRes.gainedExp, expRes.newLevel, expRes.newExp, nil)
 			DigNetwork.DigDropVFX.fireAll(p, won.id)
