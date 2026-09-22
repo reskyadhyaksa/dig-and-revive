@@ -61,13 +61,26 @@ function ZoneService.RegisterZone(zoneId: string, islandId: string, container: I
 	_registered[zoneId] = { info = info, instance = zoneInstance, trove = zTrove }
 end
 
-local function ScanZones(zoneRoot: Instance)
-	for _, island in zoneRoot:GetChildren() do
-		local z = island:FindFirstChild("Zoning")
-		if z and (z:IsA("Model") or z:IsA("Folder") or z:IsA("BasePart")) then
-			ZoneService.RegisterZone(string.format("%s_Zoning", island.Name), island.Name, z)
-		end
+local function ScanIsland(island: Instance)
+	if not island:IsA("Model") and not island:IsA("Folder") then return end
+	local z = island:FindFirstChild("Zoning")
+	if z and (z:IsA("Model") or z:IsA("Folder") or z:IsA("BasePart")) then
+		ZoneService.RegisterZone(string.format("%s_Zoning", island.Name), island.Name, z)
+	else
+		local conn: RBXScriptConnection? = nil
+		conn = island.ChildAdded:Connect(function(child)
+			if child.Name == "Zoning" then
+				if conn then conn:Disconnect() conn = nil end
+				ZoneService.RegisterZone(string.format("%s_Zoning", island.Name), island.Name, child)
+			end
+		end)
+		_trove:Add(function() if conn then conn:Disconnect() end end)
 	end
+end
+
+local function ScanZones(zoneRoot: Instance)
+	for _, island in zoneRoot:GetChildren() do ScanIsland(island) end
+	_trove:Connect(zoneRoot.ChildAdded, ScanIsland)
 end
 
 function ZoneService.Init()
@@ -80,28 +93,13 @@ function ZoneService.Init()
 	end)
 
 	local root = Workspace:FindFirstChild("Zone")
-	if root then
-		ScanZones(root)
-	else
-		_trove:Connect(Workspace.ChildAdded, function(c)
-			if c.Name == "Zone" then ScanZones(c) end
-		end)
+	if root then ScanZones(root) else
+		_trove:Connect(Workspace.ChildAdded, function(c) if c.Name == "Zone" then ScanZones(c) end end)
 	end
 end
 
 function ZoneService.GetPlayerCurrentZone(p: Player): ZoneInfo?
-	local cur = _playerZones[p]
-	if cur then return cur end
-	if next(_registered) == nil then
-		local fallback: ZoneInfo = {
-			zoneId = "Island1_Zoning",
-			displayName = "Starter Island Dig Zone",
-			islandId = "Island1",
-			instance = nil,
-		}
-		return fallback
-	end
-	return nil
+	return _playerZones[p]
 end
 
 function ZoneService.Destroy()

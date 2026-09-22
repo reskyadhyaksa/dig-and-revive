@@ -42,6 +42,7 @@ local function ZoneNotificationBanner(props: Props): any
 		Position = UDim2.fromScale(0.5, currentYScale),
 		Size = UDim2.new(0.85, 0, 0.09, 0),
 		BackgroundTransparency = 1,
+		ZIndex = 30,
 	}, {
 		SizeConstraint = React.createElement("UISizeConstraint", {
 			MinSize = Vector2.new(240, 52),
@@ -93,12 +94,12 @@ local function ZoneNotificationBanner(props: Props): any
 			Size = UDim2.new(1, 0, 0.24, 0),
 			BackgroundTransparency = 1,
 			Text = string.upper(props.subtitle),
-			TextColor3 = Color3.fromRGB(225, 45, 45),
+			TextColor3 = Color3.fromRGB(255, 255, 255),
 			TextTransparency = currentTransparency,
 			TextScaled = true,
 			Font = Enum.Font.FredokaOne,
 		}, {
-			Stroke = UIBuilder.TextStroke(Color3.fromRGB(20, 0, 0), 1.6),
+			Stroke = UIBuilder.TextStroke(Color3.fromRGB(0, 0, 0), 1.6),
 			SizeConstraint = React.createElement("UISizeConstraint", {
 				MaxSize = Vector2.new(1000, 15),
 			}),

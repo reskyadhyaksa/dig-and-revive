@@ -11,6 +11,7 @@ local ZoneController = require(script.Controllers.ZoneController)
 local DigController = require(script.Controllers.DigController)
 local DropVFXController = require(script.Controllers.DropVFXController)
 local OverheadController = require(script.Controllers.OverheadController)
+local CompassController = require(script.Controllers.CompassController)
 local App = require(script.UI.App)
 
 local StarterGui = game:GetService("StarterGui")
@@ -33,6 +34,7 @@ ZoneController.Init()
 DigController.Init()
 DropVFXController.Init()
 OverheadController.Init()
+CompassController.Init()
 
 -- 2. Mount React UI
 local root = ReactRoblox.createRoot(Instance.new("Folder"))

@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("React"))
 
 local ZoneNotificationBanner = require(script.Parent.Components.ZoneNotificationBanner)
+local CompassTapeGui = require(script.Parent.Components.Compass.CompassTapeGui)
 local HoldPowerBar = require(script.Parent.Components.HoldPowerBar)
 local DigMinigame = require(script.Parent.Components.DigMinigame)
 local StatsHUD = require(script.Parent.Components.StatsHUD)
@@ -12,6 +13,7 @@ local InventoryModal = require(script.Parent.Components.Inventory.InventoryModal
 local IndexModal = require(script.Parent.Components.Index.IndexModal)
 local DigController = require(script.Parent.Parent.Controllers.DigController)
 local useAppSignals = require(script.Parent.Hooks.useAppSignals)
+local useCompass = require(script.Parent.Hooks.useCompass)
 local DefaultInventoryHelper = require(script.Parent.Common.DefaultInventoryHelper)
 local InventoryTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"):WaitForChild("InventoryTypes"))
 
@@ -27,6 +29,7 @@ end
 
 local function App(): any
 	local state = useAppSignals()
+	local compass = useCompass()
 	local invOpen, setInvOpen = React.useState(false)
 	local invTab, setInvTab = React.useState("Items")
 	local indexOpen, setIndexOpen = React.useState(false)
@@ -36,6 +39,12 @@ local function App(): any
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		IgnoreGuiInset = true,
 	}, {
+		Compass = React.createElement(CompassTapeGui, {
+			yawDeg = compass.yawDeg,
+			waypoints = compass.waypoints,
+			visible = not invOpen and not indexOpen,
+		}),
+
 		Banner = React.createElement(ZoneNotificationBanner, {
 			title = state.notif.title, subtitle = state.notif.subtitle,
 			visible = state.notif.visible, themeColor = state.notif.themeColor,

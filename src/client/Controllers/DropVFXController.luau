@@ -1,6 +1,5 @@
 --!strict
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -44,7 +43,10 @@ function DropVFXController.PlaySurfaceRiseDrop(playerInst: Instance, dropId: str
 
 	local clone = model:Clone()
 	local primary = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
-	if not primary then clone:Destroy() return end
+	if not primary then
+		clone:Destroy()
+		return
+	end
 	clone.PrimaryPart = primary
 
 	for _, p in clone:GetDescendants() do
@@ -58,7 +60,7 @@ function DropVFXController.PlaySurfaceRiseDrop(playerInst: Instance, dropId: str
 
 	local groundPos = GetGroundPosition(char)
 	local initialScale = clone:GetScale()
-	clone:ScaleTo(math.max(0.01, initialScale * 0.15))
+	clone:ScaleTo(math.max(0.01, initialScale * 0.05))
 	clone:PivotTo(CFrame.new(groundPos))
 	clone.Parent = Workspace
 
@@ -70,20 +72,26 @@ function DropVFXController.PlaySurfaceRiseDrop(playerInst: Instance, dropId: str
 		if elapsed < 0.85 then
 			local alpha = math.clamp(elapsed / 0.85, 0, 1)
 			local easeY = TweenService:GetValue(alpha, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			local easeScale = TweenService:GetValue(alpha, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 			local currentY = groundPos.Y + (easeY * 2.5)
 			local rotAngle = alpha * (math.pi * 4)
 			clone:PivotTo(CFrame.new(groundPos.X, currentY, groundPos.Z) * CFrame.Angles(0, rotAngle, 0))
-			clone:ScaleTo(math.max(0.01, initialScale * (0.15 + (easeY * 0.95))))
+			clone:ScaleTo(math.max(0.01, initialScale * (0.05 + (0.95 * easeScale))))
 		elseif elapsed < 1.40 then
 			local popElapsed = elapsed - 0.85
 			local popAlpha = math.clamp(popElapsed / 0.55, 0, 1)
-			local popScale = if popAlpha < 0.25 then (1.10 + ((popAlpha / 0.25) * 0.28)) else math.max(0.01, 1.38 * (1 - TweenService:GetValue((popAlpha - 0.25) / 0.75, Enum.EasingStyle.Back, Enum.EasingDirection.In)))
+			local popScale = if popAlpha < 0.20
+				then (1.0 + ((popAlpha / 0.20) * 0.20))
+				else math.max(0.01, 1.20 * (1 - TweenService:GetValue((popAlpha - 0.20) / 0.80, Enum.EasingStyle.Back, Enum.EasingDirection.In)))
 			local rotAngle = (math.pi * 4) + (popAlpha * math.pi * 2)
 			local currentY = groundPos.Y + 2.5 + (math.sin(popAlpha * math.pi) * 0.35)
 			clone:PivotTo(CFrame.new(groundPos.X, currentY, groundPos.Z) * CFrame.Angles(0, rotAngle, 0))
 			clone:ScaleTo(math.max(0.01, initialScale * popScale))
 		else
-			if conn then conn:Disconnect() conn = nil end
+			if conn then
+				conn:Disconnect()
+				conn = nil
+			end
 			clone:Destroy()
 		end
 	end)

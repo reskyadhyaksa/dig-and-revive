@@ -1,5 +1,5 @@
 ---
-trigger: always_on
+trigger: manual
 ---
 
 # ⚡ PROTOCOL: ROBLOX ENGINE ARCHITECTURE (GEMINI.md)

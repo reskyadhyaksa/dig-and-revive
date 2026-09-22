@@ -10,6 +10,7 @@ local DropUtils = require(Shared:WaitForChild("Utils"):WaitForChild("DropUtils")
 local LevelUtils = require(Shared:WaitForChild("Utils"):WaitForChild("LevelUtils"))
 local PowerBarHelper = require(Shared:WaitForChild("Common"):WaitForChild("PowerBarHelper"))
 local DropTypes = require(Shared:WaitForChild("Types"):WaitForChild("DropTypes"))
+local DigMinigameConfig = require(Shared:WaitForChild("Configs"):WaitForChild("DigMinigameConfig"))
 local DigNetwork = require(script.Parent.Parent:WaitForChild("Network"):WaitForChild("DigNetwork"))
 local ZoneService = require(script.Parent:WaitForChild("ZoneService"))
 local PlayerService = require(script.Parent:WaitForChild("PlayerService"))
@@ -19,18 +20,13 @@ local InventoryRepository = require(script.Parent.Parent:WaitForChild("Repositor
 type DropItem = DropTypes.DropItem
 type DigSession = {
 	player: Player, islandId: string, power: number, drop: DropItem,
-	currentHp: number, maxHp: number, expireTime: number, lastSwingTime: number,
+	currentHp: number, maxHp: number, expireTime: number, lastSwingTime: number, digDamage: number,
 }
 
 local DigService = {}
 local _trove = Trove.new()
 local _playerLastDigEndTime: { [Player]: number } = {}
 local _activeSessions: { [Player]: DigSession } = {}
-local DEFAULT_DURATION = 15.0
-
-local TIER_HP: { [DropTypes.RarityTier]: number } = {
-	Common = 3, Uncommon = 4, Epic = 5, Legendary = 6, Mythic = 8, Secret = 10,
-}
 
 local function SendFail(p: Player, msg: string)
 	DigNetwork.MinigameComplete.fire(p, false, nil, 0, 0, PlayerService.GetPlayerLevel(p), PlayerService.GetPlayerExp(p), msg)
@@ -62,12 +58,14 @@ function DigService.Init()
 		local drop = DropUtils.RollDrop(zone.islandId, totalLuck)
 		if not drop then _playerLastDigEndTime[p] = now SendFail(p, "No item found.") return end
 
-		local hp = TIER_HP[drop.tier] or 3
+		local baseHp = DigMinigameConfig.TierHp[drop.tier] or 12
+		local damage = math.max(1, math.floor(shovelCfg.digPower / 10))
 		_activeSessions[p] = {
 			player = p, islandId = islandId, power = power, drop = drop,
-			currentHp = hp, maxHp = hp, expireTime = now + DEFAULT_DURATION, lastSwingTime = 0,
+			currentHp = baseHp, maxHp = baseHp, expireTime = now + DigMinigameConfig.Duration,
+			lastSwingTime = 0, digDamage = damage,
 		}
-		DigNetwork.StartMinigame.fire(p, drop.tier, hp, DEFAULT_DURATION)
+		DigNetwork.StartMinigame.fire(p, drop.tier, baseHp, DigMinigameConfig.Duration)
 	end))
 
 	_trove:Add(DigNetwork.SwingRequest.on(function(p: Player)
@@ -79,9 +77,18 @@ function DigService.Init()
 			SendFail(p, "Minigame time expired!") return
 		end
 
-		if now - s.lastSwingTime < 0.08 then return end
+		if now - s.lastSwingTime < DigMinigameConfig.SwingCooldown then return end
 		s.lastSwingTime = now
-		s.currentHp = math.max(0, s.currentHp - 1)
+		s.currentHp = math.max(0, s.currentHp - s.digDamage)
+
+		-- Random Soil Resistance Surge / Regen Event
+		if s.currentHp > 0 and s.currentHp >= DigMinigameConfig.RegenEvent.thresholdMinHp and s.currentHp < s.maxHp then
+			if math.random() < DigMinigameConfig.RegenEvent.chance then
+				local regen = math.random(DigMinigameConfig.RegenEvent.minAmount, DigMinigameConfig.RegenEvent.maxAmount)
+				s.currentHp = math.min(s.maxHp, s.currentHp + regen)
+			end
+		end
+
 		DigNetwork.MinigameHit.fire(p, s.currentHp, s.maxHp)
 
 		if s.currentHp <= 0 then

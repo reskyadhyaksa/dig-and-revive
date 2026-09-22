@@ -51,8 +51,8 @@ local function useAppSignals(): AppState
 				setNotif({ title = zone.displayName, subtitle = "MEMASUKI AREA", visible = true, themeColor = Color3.fromRGB(46, 204, 113) })
 				timer = task.delay(3.5, function() setNotif(function(p) return { title = p.title, subtitle = p.subtitle, visible = false, themeColor = p.themeColor } end) end)
 			else
-				setNotif({ title = "Area Terbuka", subtitle = "KELUAR ZONA", visible = true, themeColor = Color3.fromRGB(230, 126, 34) })
-				timer = task.delay(2.5, function() setNotif(function(p) return { title = p.title, subtitle = p.subtitle, visible = false, themeColor = p.themeColor } end) end)
+				setNotif({ title = "Free Area", subtitle = "KELUAR ZONA", visible = true, themeColor = Color3.fromRGB(230, 126, 34) })
+				timer = task.delay(3.0, function() setNotif(function(p) return { title = p.title, subtitle = p.subtitle, visible = false, themeColor = p.themeColor } end) end)
 			end
 		end)
 
