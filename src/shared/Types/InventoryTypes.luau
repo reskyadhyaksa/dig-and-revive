@@ -1,6 +1,6 @@
 --!strict
 
-export type ItemCategory = "Items" | "Shovel" | "Potion" | string
+export type ItemCategory = "Fossils" | "Revival" | "Items" | "Shovel" | "Potion" | "Codex" | string
 export type ItemRarity = "Common" | "Uncommon" | "Epic" | "Legendary" | "Mythic" | "Secret"
 export type SortOption = "Newest" | "Oldest" | "Rarity" | "Weight" | "Name" | "Favorited"
 

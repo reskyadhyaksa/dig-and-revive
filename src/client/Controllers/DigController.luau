@@ -27,13 +27,11 @@ local function GetState(): DigState return _state end
 local function SetState(s: DigState) _state = s end
 
 local function EndMinigame()
-	if _minigameTrove then
-		_minigameTrove:Clean()
-		_minigameTrove = nil
-	end
+	if _minigameTrove then _minigameTrove:Clean() _minigameTrove = nil end
 	SetState("COOLDOWN")
 	_currentProgress = 0.0
 	DigController.MinigameStateChanged:Fire(false, 0, 0)
+	DigInputController.SetSpeed(DigInputController.NORMAL_SPEED)
 	_cooldownUntil = os.clock() + 1.4
 	task.delay(1.4, function()
 		if GetState() == "COOLDOWN" then SetState("IDLE") end
@@ -45,6 +43,7 @@ function DigController.Init()
 		onChargeStart = function()
 			if GetState() ~= "IDLE" or os.clock() < _cooldownUntil then return false end
 			SetState("CHARGING")
+			DigInputController.SetSpeed(DigInputController.SLOW_SPEED)
 			DigController.PowerBarStateChanged:Fire(true, 0)
 			return true
 		end,
@@ -57,7 +56,10 @@ function DigController.Init()
 			DigController.PowerBarStateChanged:Fire(false, finalPower)
 			DigPopups.ShowLuckTier(finalPower)
 			local zone = ZoneController.GetCurrentZone()
-			if zone then DigNetwork.StartDigRequest.fire(finalPower, zone.islandId) else SetState("IDLE") end
+			if zone then DigNetwork.StartDigRequest.fire(finalPower, zone.islandId) else
+				SetState("IDLE")
+				DigInputController.SetSpeed(DigInputController.NORMAL_SPEED)
+			end
 		end,
 		onTap = function() if GetState() == "MINIGAME" then DigController.Swing() end end,
 	})

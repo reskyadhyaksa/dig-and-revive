@@ -246,6 +246,16 @@ local function ReadEVENT_PlayerStatsSync(): (number, number, number, number, num
 	return Value1, Value2, Value3, Value4, Value5
 end
 
+local function WriteEVENT_EquipItemRequest(Value: string): ()
+	-- Allocate BLOCK: 3 bytes
+	local BLOCK_START = Allocate(3)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 7)
+	local Length = #Value
+	buffer.writeu16(SendBuffer, BLOCK_START + 1, Length)
+	Allocate(Length)
+	buffer.writestring(SendBuffer, SendOffset, Value, Length)
+end
+
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
@@ -269,6 +279,9 @@ if not RunService:IsRunning() then
 	},
 	PlayerStatsSync = {
 		on = NOOP
+	},
+	EquipItemRequest = {
+		fire = NOOP
 	},
 	})
 	return Returns :: BLINK_EVENTS_SYMBOL
@@ -468,6 +481,11 @@ local Returns = table.freeze({
 					Events.Reliable[6] = nil
 				end
 			end
+		end
+	},
+	EquipItemRequest = {
+		fire = function(Value: string): ()
+			WriteEVENT_EquipItemRequest(Value)
 		end
 	},
 })

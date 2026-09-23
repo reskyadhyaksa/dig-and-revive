@@ -71,7 +71,10 @@ local function useAppSignals(): AppState
 		end) else nil
 
 		return function()
-			zConn:Disconnect() pConn:Disconnect() mConn:Disconnect() sConn:Disconnect()
+			zConn:Disconnect()
+			pConn:Disconnect()
+			mConn:Disconnect()
+			sConn:Disconnect()
 			if idxConn then idxConn:Disconnect() end
 			if invConn then invConn:Disconnect() end
 			if timer then task.cancel(timer) end

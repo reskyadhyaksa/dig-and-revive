@@ -160,6 +160,7 @@ local SerdesEvent = "?"
 local SerdesThread: thread?
 Queue.Reliable[0] = table.create(256)
 Queue.Reliable[2] = table.create(256)
+Queue.Reliable[7] = table.create(256)
 local function ReadEVENT_StartDigRequest(): (number, string)
 	-- Read BLOCK: 10 bytes
 	local BLOCK_START = Read(10)
@@ -244,6 +245,14 @@ local function WriteEVENT_PlayerStatsSync(Value1: number, Value2: number, Value3
 	buffer.writef64(SendBuffer, BLOCK_START + 17, Value5)
 end
 
+local function ReadEVENT_EquipItemRequest(): (string)
+	-- Read BLOCK: 2 bytes
+	local BLOCK_START = Read(2)
+	local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
+	local Value = buffer.readstring(RecieveBuffer, Read(Length), Length)
+	return Value
+end
+
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
@@ -282,6 +291,9 @@ if not RunService:IsRunning() then
 		fireAll = NOOP,
 		fireList = NOOP,
 		fireExcept = NOOP
+	},
+	EquipItemRequest = {
+		on = NOOP
 	},
 	})
 	return Returns :: BLINK_EVENTS_SYMBOL
@@ -364,6 +376,16 @@ Reliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instance
 					warn("[Blink]: Event queue of \"SwingRequest\" exceeded 256, did you forget to implement a listener?")
 				end
 				table.insert(Queue.Reliable[2], {Player, Value} :: {any})
+			end
+		elseif Index == 7 then
+			local Value: string = ReadEVENT_EquipItemRequest()
+			if Events.Reliable[7] ~= nil then
+				task.spawn(Events.Reliable[7], Player, Value)
+			else
+				if #Queue.Reliable[7] > 256 then
+					warn("[Blink]: Event queue of \"EquipItemRequest\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[7], {Player, Value} :: {any})
 			end
 		end
 	end
@@ -647,6 +669,20 @@ local Returns = table.freeze({
 				PlayersMap[Player] = Save()
 			end
 		end,
+	},
+	EquipItemRequest = {
+		on = function(Listener: (Player: Player, Value: string) -> ()): () -> ()
+			Events.Reliable[7] = Listener
+			for Index, Arguments in Queue.Reliable[7] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[7] = {}
+			return function (): ()
+				if Events.Reliable[7] == Listener then
+					Events.Reliable[7] = nil
+				end
+			end
+		end
 	},
 })
 type BLINK_EVENTS_SYMBOL = typeof(Returns)

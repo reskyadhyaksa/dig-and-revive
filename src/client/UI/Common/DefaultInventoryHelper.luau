@@ -34,7 +34,7 @@ function DefaultInventoryHelper.GetClientShovelItems(): { InventoryItem }
 				amount = 1,
 				icon = "rbxassetid://100488739842115",
 				description = string.format("Standard %s suitable for excavators.", starter.displayName),
-				isEquipped = isEquippedInChar or isInBackpack,
+				isEquipped = isEquippedInChar,
 				isFavorite = false,
 				obtainedAt = os.time(),
 				stats = {

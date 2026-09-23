@@ -9,9 +9,11 @@ local InventoryConfig = {
 	MaxCapacityHardCap = 2500,
 
 	Tabs = {
-		{ id = "Items", displayName = "Items", icon = "rbxassetid://122992611665292", order = 1 },
-		{ id = "Shovel", displayName = "Shovels", icon = "rbxassetid://100488739842115", order = 2 },
-		{ id = "Potion", displayName = "Potions", icon = "rbxassetid://100488739842115", order = 3 },
+		{ id = "Fossils", displayName = "Fossils", icon = "rbxassetid://135832742918451", order = 1 },
+		{ id = "Revival", displayName = "Revival", icon = "rbxassetid://122992611665292", order = 2 },
+		{ id = "Shovel", displayName = "Shovels", icon = "rbxassetid://100488739842115", order = 3 },
+		{ id = "Potion", displayName = "Potions", icon = "rbxassetid://100488739842115", order = 4 },
+		{ id = "Codex", displayName = "Codex", icon = "rbxassetid://100488739842115", order = 5 },
 	} :: { TabConfig },
 
 	SortOptions = {

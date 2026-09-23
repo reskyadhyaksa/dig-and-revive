@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local InventoryTypes = require(Shared:WaitForChild("Types"):WaitForChild("InventoryTypes"))
 local DropTypes = require(Shared:WaitForChild("Types"):WaitForChild("DropTypes"))
+local DropUtils = require(Shared:WaitForChild("Utils"):WaitForChild("DropUtils"))
 local PlayerProfileStore = require(script.Parent.PlayerProfileStore)
 
 type InventoryItem = InventoryTypes.InventoryItem
@@ -14,23 +15,20 @@ local InventoryRepository = {}
 
 local DEFAULT_ICONS: { [string]: string } = {
 	Fossils = "rbxassetid://135832742918451",
+	Revival = "rbxassetid://122992611665292",
 	Relics = "rbxassetid://135832742918451",
 	Secrets = "rbxassetid://135832742918451",
 	Items = "rbxassetid://135832742918451",
 }
 
 local function SyncAttribute(player: Player, items: { InventoryItem })
-	pcall(function()
-		player:SetAttribute("InventoryData", HttpService:JSONEncode(items))
-	end)
+	pcall(function() player:SetAttribute("InventoryData", HttpService:JSONEncode(items)) end)
 end
 
 function InventoryRepository.GetInventory(player: Player): { InventoryItem }
 	local data = PlayerProfileStore.GetProfileData(player)
 	if not data then return {} end
-	if not data.inventory then
-		data.inventory = {}
-	end
+	if not data.inventory then data.inventory = {} end
 	local items = data.inventory :: { InventoryItem }
 	SyncAttribute(player, items)
 	return items
@@ -43,7 +41,8 @@ function InventoryRepository.AddItem(player: Player, drop: DropItem, amount: num
 
 	local items = data.inventory :: { InventoryItem }
 	local count = amount or 1
-	local cat = drop.category or "Items"
+	local cat = drop.category or "Fossils"
+	local genWeight = drop.weight or DropUtils.GenerateWeight(drop)
 
 	local newItem: InventoryItem = {
 		id = drop.id .. "_" .. tostring(os.time()) .. "_" .. tostring(math.random(100, 999)),
@@ -51,10 +50,36 @@ function InventoryRepository.AddItem(player: Player, drop: DropItem, amount: num
 		displayName = drop.displayName,
 		category = cat,
 		tier = drop.tier,
-		weight = 1.0,
+		weight = genWeight,
 		amount = count,
-		icon = drop.icon or DEFAULT_ICONS[cat] or DEFAULT_ICONS.Items,
+		icon = drop.icon or DEFAULT_ICONS[cat] or DEFAULT_ICONS.Fossils,
 		description = drop.description or string.format("A fine %s excavated from %s.", drop.displayName, drop.islandId),
+		isEquipped = false,
+		isFavorite = false,
+		obtainedAt = os.time(),
+	}
+
+	table.insert(items, newItem)
+	SyncAttribute(player, items)
+	return newItem
+end
+
+function InventoryRepository.AddRevivalItem(player: Player, templateId: string, displayName: string, tier: any, weight: number, description: string?): InventoryItem?
+	local data = PlayerProfileStore.GetProfileData(player)
+	if not data then return nil end
+	if not data.inventory then data.inventory = {} end
+
+	local items = data.inventory :: { InventoryItem }
+	local newItem: InventoryItem = {
+		id = "Revival_" .. templateId .. "_" .. tostring(os.time()) .. "_" .. tostring(math.random(100, 999)),
+		templateId = templateId,
+		displayName = displayName,
+		category = "Revival",
+		tier = tier,
+		weight = weight,
+		amount = 1,
+		icon = DEFAULT_ICONS.Revival,
+		description = description or string.format("A living %s successfully revived on the altar.", displayName),
 		isEquipped = false,
 		isFavorite = false,
 		obtainedAt = os.time(),
@@ -78,6 +103,33 @@ function InventoryRepository.RemoveItem(player: Player, uniqueId: string): boole
 		end
 	end
 	return false
+end
+
+function InventoryRepository.FindItem(player: Player, uniqueId: string): InventoryItem?
+	local data = PlayerProfileStore.GetProfileData(player)
+	if not data or not data.inventory then return nil end
+	for _, item in ipairs(data.inventory :: { InventoryItem }) do
+		if item.id == uniqueId then return item end
+	end
+	return nil
+end
+
+function InventoryRepository.SetItemEquipped(player: Player, uniqueId: string, isEquipped: boolean): boolean
+	local data = PlayerProfileStore.GetProfileData(player)
+	if not data or not data.inventory then return false end
+	local items = data.inventory :: { InventoryItem }
+	local found = false
+
+	for _, item in ipairs(items) do
+		if item.id == uniqueId then
+			item.isEquipped = isEquipped
+			found = true
+			break
+		end
+	end
+
+	if found then SyncAttribute(player, items) end
+	return found
 end
 
 return InventoryRepository

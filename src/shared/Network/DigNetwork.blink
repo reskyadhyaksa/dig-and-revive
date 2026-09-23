@@ -50,3 +50,10 @@ event PlayerStatsSync {
     Call: SingleAsync,
     Data: (u32, u32, u32, u32, f64),
 }
+
+event EquipItemRequest {
+    From: Client,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: string,
+}

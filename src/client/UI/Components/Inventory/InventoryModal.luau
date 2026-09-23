@@ -21,6 +21,7 @@ export type Props = {
 	playerLevel: number,
 	defaultTab: ItemCategory?,
 	onClose: () -> (),
+	onOpenCodex: (() -> ())?,
 	onEquipToggle: ((item: InventoryItem) -> ())?,
 	onDrop: ((item: InventoryItem) -> ())?,
 }
@@ -33,9 +34,7 @@ local function InventoryModal(props: Props): any
 		defaultTab = props.defaultTab,
 	})
 
-	if not props.visible then
-		return nil
-	end
+	if not props.visible then return nil end
 
 	local gridChildren: { [string]: any } = {
 		Corner = UIBuilder.Corner(8),
@@ -73,34 +72,34 @@ local function InventoryModal(props: Props): any
 			PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12),
 			PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10),
 		}),
-
 		Header = React.createElement(InventoryHeader, {
 			title = "Inventory", searchQuery = inv.searchQuery, onSearchChange = inv.setSearchQuery,
 			sortOption = inv.sortOption, onCycleSort = inv.cycleSortOption,
 			usedCapacity = inv.usedCapacity, maxCapacity = inv.maxCapacity, onClose = props.onClose,
 		}),
 		Body = React.createElement("Frame", {
-			Position = UDim2.new(0, 0, 0, 42),
-			Size = UDim2.new(1, 0, 1, -42),
-			BackgroundTransparency = 1,
-			ZIndex = 2,
+			Position = UDim2.new(0, 0, 0, 42), Size = UDim2.new(1, 0, 1, -42),
+			BackgroundTransparency = 1, ZIndex = 2,
 		}, {
-			Tabs = React.createElement(InventoryTabList, { activeTab = inv.activeTab, onSelectTab = inv.setActiveTab }),
+			Tabs = React.createElement(InventoryTabList, {
+				activeTab = inv.activeTab,
+				onSelectTab = function(tab)
+					if tab == "Codex" then
+						if props.onOpenCodex then props.onOpenCodex() end
+					else
+						inv.setActiveTab(tab)
+					end
+				end,
+			}),
 			GridContainer = React.createElement("ScrollingFrame", {
-				Position = UDim2.new(0.19, 6, 0, 0),
-				Size = UDim2.new(0.53, -12, 1, 0),
-				BackgroundColor3 = Color3.fromHex("#1E2430"),
-				BorderSizePixel = 0,
-				ScrollBarThickness = 5,
-				ScrollBarImageColor3 = Color3.fromHex("#523017"),
-				CanvasSize = UDim2.new(0, 0, 0, 0),
-				AutomaticCanvasSize = Enum.AutomaticSize.Y,
+				Position = UDim2.new(0.19, 6, 0, 0), Size = UDim2.new(0.53, -12, 1, 0),
+				BackgroundColor3 = Color3.fromHex("#1E2430"), BorderSizePixel = 0,
+				ScrollBarThickness = 5, ScrollBarImageColor3 = Color3.fromHex("#523017"),
+				CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			}, gridChildren),
 			Detail = React.createElement(InventoryDetailPanel, {
-				item = inv.selectedItem,
-				isFavorite = selFav,
-				onToggleFavorite = inv.toggleFavorite,
-				onEquipToggle = props.onEquipToggle,
+				item = inv.selectedItem, isFavorite = selFav,
+				onToggleFavorite = inv.toggleFavorite, onEquipToggle = props.onEquipToggle,
 				onDrop = props.onDrop,
 			}),
 		}),

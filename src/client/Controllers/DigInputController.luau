@@ -4,7 +4,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Trove = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Trove"))
 
@@ -17,16 +16,16 @@ local LocalPlayer = Players.LocalPlayer
 local DigInputController = {}
 local _trove = Trove.new()
 
-local CHARGE_SPEED = 2.5
-local SLOW_SPEED = 6
-local NORMAL_SPEED = 16
+DigInputController.CHARGE_SPEED = 2.5
+DigInputController.SLOW_SPEED = 4
+DigInputController.NORMAL_SPEED = 16
 
 local function GetHum(): Humanoid?
 	local char = LocalPlayer.Character
 	return if char then char:FindFirstChildOfClass("Humanoid") else nil
 end
 
-local function SetSpeed(s: number)
+function DigInputController.SetSpeed(s: number)
 	local hum = GetHum()
 	if hum then hum.WalkSpeed = s end
 end
@@ -44,8 +43,7 @@ end
 local function IsPointerOverGui(pos: Vector3): boolean
 	local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
 	if not playerGui then return false end
-	local guis = playerGui:GetGuiObjectsAtPosition(pos.X, pos.Y)
-	for _, gui in guis do
+	for _, gui in ipairs(playerGui:GetGuiObjectsAtPosition(pos.X, pos.Y)) do
 		if gui.Visible and (gui:IsA("GuiButton") or gui.Active or gui:IsA("TextBox") or gui:IsA("ScrollingFrame")) then
 			return true
 		end
@@ -67,7 +65,6 @@ function DigInputController.BindChargeInput(callbacks: {
 		if not isCharging then return end
 		isCharging = false
 		if renderConn then renderConn:Disconnect() renderConn = nil end
-		SetSpeed(NORMAL_SPEED)
 		callbacks.onChargeEnd(currentPower)
 	end
 
@@ -82,11 +79,11 @@ function DigInputController.BindChargeInput(callbacks: {
 
 		if not callbacks.onChargeStart() then return end
 		isCharging = true
-		SetSpeed(SLOW_SPEED)
+		DigInputController.SetSpeed(DigInputController.SLOW_SPEED)
 
 		local startTime = os.clock()
 		renderConn = RunService.RenderStepped:Connect(function()
-			local t = (os.clock() - startTime) * CHARGE_SPEED
+			local t = (os.clock() - startTime) * DigInputController.CHARGE_SPEED
 			local cycle = t % 2
 			currentPower = if cycle < 1 then cycle else 2 - cycle
 			callbacks.onChargeStep(currentPower)

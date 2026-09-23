@@ -58,7 +58,9 @@ function InventoryUtils.FilterAndSortItems(
 	local rWeights = InventoryConfig.RarityWeights
 
 	for _, item in ipairs(items) do
-		local matchTab = (activeTab == "All") or (item.category == activeTab)
+		local matchTab = (activeTab == "All")
+			or (activeTab == "Fossils" and (item.category == "Fossils" or item.category == "Items"))
+			or (item.category == activeTab)
 		local matchSearch = (query == "") or (string.find(string.lower(item.displayName), query, 1, true) ~= nil)
 		if matchTab and matchSearch then table.insert(filtered, item) end
 	end
