@@ -12,13 +12,18 @@ local CompassSideButton = require(script.Parent:WaitForChild("CompassSideButton"
 
 type ProcessedWaypoint = CompassTypes.ProcessedWaypoint
 
-local ICONS = { Home = "rbxassetid://120414131422133", Settings = "rbxassetid://89287268052902" }
+local ICONS = {
+	Home = "rbxassetid://120414131422133",
+	Index = "rbxassetid://135832742918451",
+	Settings = "rbxassetid://89287268052902",
+}
 
 export type Props = {
 	yawDeg: number,
 	waypoints: { ProcessedWaypoint },
 	visible: boolean?,
 	onHomeActivated: (() -> ())?,
+	onIndexActivated: (() -> ())?,
 	onSettingsActivated: (() -> ())?,
 }
 
@@ -53,8 +58,15 @@ local function CompassTapeGui(props: Props): any
 			onActivated = props.onHomeActivated,
 		}),
 
+		IndexBtn = React.createElement(CompassSideButton, {
+			layoutOrder = 2, icon = ICONS.Index,
+			faceColor = CompassTheme.IndexBtn.faceColor, gradientColors = CompassTheme.IndexBtn.gradientColors,
+			shadowColor = CompassTheme.IndexBtn.shadowColor, strokeColor = CompassTheme.IndexBtn.strokeColor,
+			onActivated = props.onIndexActivated,
+		}),
+
 		TapeHousing = React.createElement("Frame", {
-			LayoutOrder = 2, Size = UDim2.new(0.76, 0, 1, 0), BackgroundTransparency = 1, ClipsDescendants = false,
+			LayoutOrder = 3, Size = UDim2.new(0.76, 0, 1, 0), BackgroundTransparency = 1, ClipsDescendants = false,
 		}, {
 			Housing = UIBuilder.BevelPlate({
 				shadowColor = CompassTheme.Frame.shadowColor, faceColor = CompassTheme.Frame.faceColor,
@@ -79,7 +91,7 @@ local function CompassTapeGui(props: Props): any
 		}),
 
 		SettingsBtn = React.createElement(CompassSideButton, {
-			layoutOrder = 3, icon = ICONS.Settings,
+			layoutOrder = 4, icon = ICONS.Settings,
 			faceColor = CompassTheme.SettingsBtn.faceColor, gradientColors = CompassTheme.SettingsBtn.gradientColors,
 			shadowColor = CompassTheme.SettingsBtn.shadowColor, strokeColor = CompassTheme.SettingsBtn.strokeColor,
 			onActivated = props.onSettingsActivated,

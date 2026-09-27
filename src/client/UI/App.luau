@@ -68,6 +68,9 @@ local function App(): any
 	}, {
 		Compass = React.createElement(CompassTapeGui, {
 			yawDeg = compass.yawDeg, waypoints = compass.waypoints, visible = not invOpen and not indexOpen,
+			onIndexActivated = function()
+				if indexOpen then setIndexOpen(false) else setIndexOpen(true) setInvOpen(false) end
+			end,
 		}),
 		Banner = React.createElement(ZoneNotificationBanner, {
 			title = state.notif.title, subtitle = state.notif.subtitle,

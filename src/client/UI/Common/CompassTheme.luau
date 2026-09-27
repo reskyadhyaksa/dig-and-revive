@@ -19,6 +19,12 @@ local CompassTheme = {
 		shadowColor = Color3.fromHex("#4E338F"),
 		strokeColor = Color3.fromHex("#331F63"),
 	},
+	IndexBtn = {
+		faceColor = Color3.fromHex("#FFE082"),
+		gradientColors = { Color3.fromHex("#FFF0B5"), Color3.fromHex("#F5C861") },
+		shadowColor = Color3.fromHex("#8C6D1F"),
+		strokeColor = Color3.fromHex("#5E4810"),
+	},
 	Tape = {
 		backgroundColor = Color3.fromHex("#DCF2FB"),
 		tickMajor = Color3.fromHex("#144350"),
