@@ -161,6 +161,8 @@ local SerdesThread: thread?
 Queue.Reliable[0] = table.create(256)
 Queue.Reliable[2] = table.create(256)
 Queue.Reliable[7] = table.create(256)
+Queue.Reliable[8] = table.create(256)
+export type SellMode = ("All" | "Held")
 local function ReadEVENT_StartDigRequest(): (number, string)
 	-- Read BLOCK: 10 bytes
 	local BLOCK_START = Read(10)
@@ -253,6 +255,39 @@ local function ReadEVENT_EquipItemRequest(): (string)
 	return Value
 end
 
+local function ReadEVENT_SellRequest(): (("All" | "Held"))
+	-- Read BLOCK: 1 bytes
+	local BLOCK_START = Read(1)
+	local Value = true :: any
+	local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+	if Index == 0 then
+		Value = "All"
+	elseif Index == 1 then
+		Value = "Held"
+	else
+		error(`Unexpected enum: {Index}`)
+	end
+	return Value
+end
+
+local function WriteEVENT_SellResult(Value1: boolean, Value2: number, Value3: number, Value4: string?): ()
+	-- Allocate BLOCK: 9 bytes
+	local BLOCK_START = Allocate(9)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 9)
+	buffer.writeu8(SendBuffer, BLOCK_START + 1, Value1 and 1 or 0)
+	buffer.writeu32(SendBuffer, BLOCK_START + 2, Value2)
+	buffer.writeu16(SendBuffer, BLOCK_START + 6, Value3)
+	buffer.writeu8(SendBuffer, BLOCK_START + 8, Value4 ~= nil and 1 or 0)
+	if Value4 ~= nil then
+		-- Allocate BLOCK: 2 bytes
+		local BLOCK_START = Allocate(2)
+		local Length = #Value4
+		buffer.writeu16(SendBuffer, BLOCK_START + 0, Length)
+		Allocate(Length)
+		buffer.writestring(SendBuffer, SendOffset, Value4, Length)
+	end
+end
+
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
@@ -294,6 +329,15 @@ if not RunService:IsRunning() then
 	},
 	EquipItemRequest = {
 		on = NOOP
+	},
+	SellRequest = {
+		on = NOOP
+	},
+	SellResult = {
+		fire = NOOP,
+		fireAll = NOOP,
+		fireList = NOOP,
+		fireExcept = NOOP
 	},
 	})
 	return Returns :: BLINK_EVENTS_SYMBOL
@@ -386,6 +430,16 @@ Reliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instance
 					warn("[Blink]: Event queue of \"EquipItemRequest\" exceeded 256, did you forget to implement a listener?")
 				end
 				table.insert(Queue.Reliable[7], {Player, Value} :: {any})
+			end
+		elseif Index == 8 then
+			local Value: ("All" | "Held") = ReadEVENT_SellRequest()
+			if Events.Reliable[8] ~= nil then
+				task.spawn(Events.Reliable[8], Player, Value)
+			else
+				if #Queue.Reliable[8] > 256 then
+					warn("[Blink]: Event queue of \"SellRequest\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[8], {Player, Value} :: {any})
 			end
 		end
 	end
@@ -683,6 +737,66 @@ local Returns = table.freeze({
 				end
 			end
 		end
+	},
+	SellRequest = {
+		on = function(Listener: (Player: Player, Value: ("All" | "Held")) -> ()): () -> ()
+			Events.Reliable[8] = Listener
+			for Index, Arguments in Queue.Reliable[8] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[8] = {}
+			return function (): ()
+				if Events.Reliable[8] == Listener then
+					Events.Reliable[8] = nil
+				end
+			end
+		end
+	},
+	SellResult = {
+		fire = function(Player: Player, Value1: boolean, Value2: number, Value3: number, Value4: string?): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_SellResult(Value1, Value2, Value3, Value4)
+			PlayersMap[Player] = Save()
+		end,
+		fireAll = function(Value1: boolean, Value2: number, Value3: number, Value4: string?): ()
+			Load()
+			WriteEVENT_SellResult(Value1, Value2, Value3, Value4)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireList = function(List: {Player}, Value1: boolean, Value2: number, Value3: number, Value4: string?): ()
+			Load()
+			WriteEVENT_SellResult(Value1, Value2, Value3, Value4)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireExcept = function(Except: Player, Value1: boolean, Value2: number, Value3: number, Value4: string?): ()
+			Load()
+			WriteEVENT_SellResult(Value1, Value2, Value3, Value4)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
 	},
 })
 type BLINK_EVENTS_SYMBOL = typeof(Returns)

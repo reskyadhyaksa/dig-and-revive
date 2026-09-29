@@ -6,6 +6,7 @@ local PlayerService = require(script.Services.PlayerService)
 local DigService = require(script.Services.DigService)
 local RevivalService = require(script.Services.RevivalService)
 local InventoryService = require(script.Services.InventoryService)
+local SellController = require(script.Controllers.SellController)
 
 -- 1. Initialize Core Services
 PlayerService.Init()
@@ -14,6 +15,7 @@ ShovelService.Init()
 DigService.Init()
 RevivalService.Init()
 InventoryService.Init()
+SellController.Init()
 
 ZoneService.PlayerEnteredZone:Connect(function(player, zoneInfo)
 	print(string.format("[ZoneService] Player '%s' entered zone: %s (%s)", player.Name, zoneInfo.displayName, zoneInfo.zoneId))

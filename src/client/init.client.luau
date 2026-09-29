@@ -13,6 +13,8 @@ local DropVFXController = require(script.Controllers.DropVFXController)
 local OverheadController = require(script.Controllers.OverheadController)
 local CompassController = require(script.Controllers.CompassController)
 local RevivalController = require(script.Controllers.RevivalController)
+local NpcInteractController = require(script.Controllers.NpcInteractController)
+local DialogCameraController = require(script.Controllers.DialogCameraController)
 local App = require(script.UI.App)
 
 local StarterGui = game:GetService("StarterGui")
@@ -37,6 +39,8 @@ DropVFXController.Init()
 OverheadController.Init()
 CompassController.Init()
 RevivalController.Init()
+NpcInteractController.Init()
+DialogCameraController.Init()
 
 -- 2. Mount React UI
 local root = ReactRoblox.createRoot(Instance.new("Folder"))

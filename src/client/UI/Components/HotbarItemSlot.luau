@@ -46,10 +46,10 @@ local function HotbarItemSlot(props: Props): any
 			[React.Event.Activated] = props.onSelect,
 		}, {
 			Plate = UIBuilder.BevelPlate({
-				shadowColor = if props.isHeld then Color3.fromRGB(12, 16, 24) else Color3.fromRGB(18, 22, 30),
+				shadowColor = rarityColor:Lerp(Color3.new(0, 0, 0), 0.35),
 				shadowYScale = 0.6,
-				faceColor = if props.isHeld then Color3.fromRGB(45, 58, 80) else Color3.fromRGB(34, 42, 58),
-				borderColor = if props.isHeld then Color3.fromRGB(255, 255, 255) else rarityColor,
+				faceColor = rarityColor:Lerp(Color3.new(1, 1, 1), if props.isHeld then 0.4 else 0.55),
+				borderColor = if props.isHeld then Color3.fromRGB(255, 255, 255) else rarityColor:Lerp(Color3.new(0, 0, 0), 0.25),
 				borderThickness = if props.isHeld then 2.8 else 2.0,
 				cornerRadius = 12,
 				children = {
@@ -75,13 +75,13 @@ local function HotbarItemSlot(props: Props): any
 				}),
 			}) else nil,
 
-			CloseBtn = React.createElement("TextButton", {
+			CloseBtn = if props.isHeld then React.createElement("TextButton", {
 				AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 4, 0, -4),
 				Size = UDim2.fromOffset(18, 18), BackgroundColor3 = Color3.fromRGB(231, 76, 60),
 				Text = "✕", TextColor3 = Color3.fromRGB(255, 255, 255), Font = Enum.Font.FredokaOne,
 				TextSize = 11, ZIndex = 12,
 				[React.Event.Activated] = function() props.onRemove() end,
-			}, { Corner = UIBuilder.Corner(9), Stroke = UIBuilder.Stroke(Color3.fromRGB(150, 40, 30), 1.2) }),
+			}, { Corner = UIBuilder.Corner(9), Stroke = UIBuilder.Stroke(Color3.fromRGB(150, 40, 30), 1.2) }) else nil,
 		}),
 	})
 end

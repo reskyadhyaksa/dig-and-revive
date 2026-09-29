@@ -12,9 +12,11 @@ local StatsHUD = require(script.Parent.Components.StatsHUD)
 local Hotbar = require(script.Parent.Components.Hotbar)
 local InventoryModal = require(script.Parent.Components.Inventory.InventoryModal)
 local IndexModal = require(script.Parent.Components.Index.IndexModal)
+local DialogBox = require(script.Parent.Components.Dialog.DialogBox)
 local DigController = require(script.Parent.Parent.Controllers.DigController)
 local useAppSignals = require(script.Parent.Hooks.useAppSignals)
 local useCompass = require(script.Parent.Hooks.useCompass)
+local useNpcDialog = require(script.Parent.Hooks.useNpcDialog)
 local DefaultInventoryHelper = require(script.Parent.Common.DefaultInventoryHelper)
 local DigNetwork = require(script.Parent.Parent:WaitForChild("Network"):WaitForChild("DigNetwork"))
 local InventoryTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"):WaitForChild("InventoryTypes"))
@@ -54,6 +56,11 @@ local function App(): any
 	local invOpen, setInvOpen = React.useState(false)
 	local invTab, setInvTab = React.useState("Fossils")
 	local indexOpen, setIndexOpen = React.useState(false)
+	local dialog = useNpcDialog(state.inventoryItems)
+
+	React.useEffect(function()
+		if dialog.isOpen then setInvOpen(false) setIndexOpen(false) end
+	end, { dialog.isOpen })
 
 	local equippedItems = React.useMemo(function()
 		local list: { InventoryItem } = {}
@@ -67,7 +74,7 @@ local function App(): any
 		ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true,
 	}, {
 		Compass = React.createElement(CompassTapeGui, {
-			yawDeg = compass.yawDeg, waypoints = compass.waypoints, visible = not invOpen and not indexOpen,
+			yawDeg = compass.yawDeg, waypoints = compass.waypoints, visible = true,
 			onIndexActivated = function()
 				if indexOpen then setIndexOpen(false) else setIndexOpen(true) setInvOpen(false) end
 			end,
@@ -85,7 +92,10 @@ local function App(): any
 			level = state.stats.level, exp = state.stats.exp,
 			requiredExp = state.stats.requiredExp, coins = state.stats.coins, luckMultiplier = state.stats.luckMultiplier,
 		}),
-		Hotbar = React.createElement(Hotbar, {
+		Dialog = if dialog.isOpen then React.createElement(DialogBox, {
+			npcName = dialog.npcName, text = dialog.text, options = dialog.options, onOption = dialog.onOption,
+		}) else nil,
+		Hotbar = if dialog.isOpen then nil else React.createElement(Hotbar, {
 			equippedItems = equippedItems,
 			onSelectShovel = function()
 				if invOpen and invTab == "Shovel" then setInvOpen(false) else setInvTab("Shovel") setInvOpen(true) setIndexOpen(false) end

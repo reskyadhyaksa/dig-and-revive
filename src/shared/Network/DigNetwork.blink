@@ -57,3 +57,19 @@ event EquipItemRequest {
     Call: SingleAsync,
     Data: string,
 }
+
+enum SellMode = { All, Held }
+
+event SellRequest {
+    From: Client,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: SellMode,
+}
+
+event SellResult {
+    From: Server,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: (boolean, u32, u16, string?),
+}

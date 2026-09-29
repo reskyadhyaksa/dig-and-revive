@@ -163,6 +163,8 @@ Queue.Reliable[4] = table.create(256)
 Events.Reliable[5] = {}
 Queue.Reliable[5] = table.create(256)
 Queue.Reliable[6] = table.create(256)
+Queue.Reliable[9] = table.create(256)
+export type SellMode = ("All" | "Held")
 local function WriteEVENT_StartDigRequest(Value1: number, Value2: string): ()
 	-- Allocate BLOCK: 11 bytes
 	local BLOCK_START = Allocate(11)
@@ -256,6 +258,35 @@ local function WriteEVENT_EquipItemRequest(Value: string): ()
 	buffer.writestring(SendBuffer, SendOffset, Value, Length)
 end
 
+local function WriteEVENT_SellRequest(Value: ("All" | "Held")): ()
+	-- Allocate BLOCK: 2 bytes
+	local BLOCK_START = Allocate(2)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 8)
+	if Value == "All" then
+		buffer.writeu8(SendBuffer, BLOCK_START + 1, 0)
+	elseif Value == "Held" then
+		buffer.writeu8(SendBuffer, BLOCK_START + 1, 1)
+	else
+		error(`Unexpected enum: {Value}, expected one of "All" or "Held".`)
+	end
+end
+
+local function ReadEVENT_SellResult(): (boolean, number, number, string?)
+	-- Read BLOCK: 8 bytes
+	local BLOCK_START = Read(8)
+	local Value1 = (buffer.readu8(RecieveBuffer, BLOCK_START + 0) == 1)
+	local Value2 = buffer.readu32(RecieveBuffer, BLOCK_START + 1)
+	local Value3 = buffer.readu16(RecieveBuffer, BLOCK_START + 5)
+	local Value4
+	if buffer.readu8(RecieveBuffer, BLOCK_START + 7) == 1 then
+		-- Read BLOCK: 2 bytes
+		local BLOCK_START = Read(2)
+		local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
+		Value4 = buffer.readstring(RecieveBuffer, Read(Length), Length)
+	end
+	return Value1, Value2, Value3, Value4
+end
+
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
@@ -282,6 +313,12 @@ if not RunService:IsRunning() then
 	},
 	EquipItemRequest = {
 		fire = NOOP
+	},
+	SellRequest = {
+		fire = NOOP
+	},
+	SellResult = {
+		on = NOOP
 	},
 	})
 	return Returns :: BLINK_EVENTS_SYMBOL
@@ -376,6 +413,16 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 					warn("[Blink]: Event queue of \"PlayerStatsSync\" exceeded 256, did you forget to implement a listener?")
 				end
 				table.insert(Queue.Reliable[6], {Value1, Value2, Value3, Value4, Value5} :: {any})
+			end
+		elseif Index == 9 then
+			local Value1: boolean, Value2: number, Value3: number, Value4: string? = ReadEVENT_SellResult()
+			if Events.Reliable[9] ~= nil then
+				task.spawn(Events.Reliable[9], Value1, Value2, Value3, Value4)
+			else
+				if #Queue.Reliable[9] > 256 then
+					warn("[Blink]: Event queue of \"SellResult\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[9], {Value1, Value2, Value3, Value4} :: {any})
 			end
 		end
 	end
@@ -486,6 +533,25 @@ local Returns = table.freeze({
 	EquipItemRequest = {
 		fire = function(Value: string): ()
 			WriteEVENT_EquipItemRequest(Value)
+		end
+	},
+	SellRequest = {
+		fire = function(Value: ("All" | "Held")): ()
+			WriteEVENT_SellRequest(Value)
+		end
+	},
+	SellResult = {
+		on = function(Listener: (Value1: boolean, Value2: number, Value3: number, Value4: string?) -> ()): () -> ()
+			Events.Reliable[9] = Listener
+			for Index, Arguments in Queue.Reliable[9] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[9] = {}
+			return function (): ()
+				if Events.Reliable[9] == Listener then
+					Events.Reliable[9] = nil
+				end
+			end
 		end
 	},
 })
