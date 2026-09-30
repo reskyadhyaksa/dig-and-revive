@@ -42,7 +42,7 @@ function DigService.Init()
 		local char = p.Character
 		if not char or not char:FindFirstChildOfClass("Humanoid") then return end
 		local tool = char:FindFirstChildWhichIsA("Tool")
-		local shovelCfg = if tool then ShovelUtils.GetShovelConfig(tool.Name) else nil
+		local shovelCfg = if tool then ShovelUtils.GetShovelConfig(ShovelUtils.ResolveToolShovelId(tool:GetAttribute("ShovelId"), tool.Name)) else nil
 		if not shovelCfg then SendFail(p, "No valid shovel equipped!") return end
 
 		local now = os.clock()

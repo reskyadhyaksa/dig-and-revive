@@ -8,6 +8,8 @@ local RevivalService = require(script.Services.RevivalService)
 local InventoryService = require(script.Services.InventoryService)
 local SellController = require(script.Controllers.SellController)
 local ShovelShopController = require(script.Controllers.ShovelShopController)
+local ShovelSkinController = require(script.Controllers.ShovelSkinController)
+local ToolGripService = require(script.Services.ToolGripService)
 
 -- 1. Initialize Core Services
 PlayerService.Init()
@@ -18,6 +20,8 @@ RevivalService.Init()
 InventoryService.Init()
 SellController.Init()
 ShovelShopController.Init()
+ShovelSkinController.Init()
+ToolGripService.Init()
 
 ZoneService.PlayerEnteredZone:Connect(function(player, zoneInfo)
 	print(string.format("[ZoneService] Player '%s' entered zone: %s (%s)", player.Name, zoneInfo.displayName, zoneInfo.zoneId))

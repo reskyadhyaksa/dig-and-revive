@@ -165,6 +165,8 @@ Queue.Reliable[8] = table.create(256)
 Queue.Reliable[10] = table.create(256)
 Queue.Reliable[11] = table.create(256)
 Queue.Reliable[13] = table.create(256)
+Queue.Reliable[14] = table.create(256)
+Queue.Reliable[15] = table.create(256)
 export type SellMode = ("All" | "Held")
 local function ReadEVENT_StartDigRequest(): (number, string)
 	-- Read BLOCK: 10 bytes
@@ -339,6 +341,55 @@ local function ReadEVENT_SelectShovelRequest(): (string)
 	return Value
 end
 
+local function ReadEVENT_BuySkinRequest(): (string)
+	-- Read BLOCK: 1 bytes
+	local BLOCK_START = Read(1)
+	local Length = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+	local Value = buffer.readstring(RecieveBuffer, Read(Length), Length)
+	if #Value < 1 then error(`Expected length of "Value" to be larger than 1, got {#Value} instead.`) end
+	if #Value > 32 then error(`Expected length of "Value" to be smaller than 32, got {#Value} instead.`) end
+	return Value
+end
+
+local function ReadEVENT_EquipSkinRequest(): (string, string?)
+	-- Read BLOCK: 2 bytes
+	local BLOCK_START = Read(2)
+	local Length = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+	local Value1 = buffer.readstring(RecieveBuffer, Read(Length), Length)
+	if #Value1 < 1 then error(`Expected length of "Value1" to be larger than 1, got {#Value1} instead.`) end
+	if #Value1 > 32 then error(`Expected length of "Value1" to be smaller than 32, got {#Value1} instead.`) end
+	local Value2
+	if buffer.readu8(RecieveBuffer, BLOCK_START + 1) == 1 then
+		-- Read BLOCK: 1 bytes
+		local BLOCK_START = Read(1)
+		Length = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+		Value2 = buffer.readstring(RecieveBuffer, Read(Length), Length)
+		if #Value2 < 1 then error(`Expected length of "Value2" to be larger than 1, got {#Value2} instead.`) end
+		if #Value2 > 32 then error(`Expected length of "Value2" to be smaller than 32, got {#Value2} instead.`) end
+	end
+	return Value1, Value2
+end
+
+local function WriteEVENT_SkinResult(Value1: boolean, Value2: string, Value3: string?): ()
+	-- Allocate BLOCK: 5 bytes
+	local BLOCK_START = Allocate(5)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 16)
+	buffer.writeu8(SendBuffer, BLOCK_START + 1, Value1 and 1 or 0)
+	local Length = #Value2
+	buffer.writeu16(SendBuffer, BLOCK_START + 2, Length)
+	Allocate(Length)
+	buffer.writestring(SendBuffer, SendOffset, Value2, Length)
+	buffer.writeu8(SendBuffer, BLOCK_START + 4, Value3 ~= nil and 1 or 0)
+	if Value3 ~= nil then
+		-- Allocate BLOCK: 2 bytes
+		local BLOCK_START = Allocate(2)
+		local Length = #Value3
+		buffer.writeu16(SendBuffer, BLOCK_START + 0, Length)
+		Allocate(Length)
+		buffer.writestring(SendBuffer, SendOffset, Value3, Length)
+	end
+end
+
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
@@ -404,6 +455,18 @@ if not RunService:IsRunning() then
 	},
 	SelectShovelRequest = {
 		on = NOOP
+	},
+	BuySkinRequest = {
+		on = NOOP
+	},
+	EquipSkinRequest = {
+		on = NOOP
+	},
+	SkinResult = {
+		fire = NOOP,
+		fireAll = NOOP,
+		fireList = NOOP,
+		fireExcept = NOOP
 	},
 	})
 	return Returns :: BLINK_EVENTS_SYMBOL
@@ -536,6 +599,26 @@ Reliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instance
 					warn("[Blink]: Event queue of \"SelectShovelRequest\" exceeded 256, did you forget to implement a listener?")
 				end
 				table.insert(Queue.Reliable[13], {Player, Value} :: {any})
+			end
+		elseif Index == 14 then
+			local Value: string = ReadEVENT_BuySkinRequest()
+			if Events.Reliable[14] ~= nil then
+				task.spawn(Events.Reliable[14], Player, Value)
+			else
+				if #Queue.Reliable[14] > 256 then
+					warn("[Blink]: Event queue of \"BuySkinRequest\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[14], {Player, Value} :: {any})
+			end
+		elseif Index == 15 then
+			local Value1: string, Value2: string? = ReadEVENT_EquipSkinRequest()
+			if Events.Reliable[15] ~= nil then
+				task.spawn(Events.Reliable[15], Player, Value1, Value2)
+			else
+				if #Queue.Reliable[15] > 256 then
+					warn("[Blink]: Event queue of \"EquipSkinRequest\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[15], {Player, Value1, Value2} :: {any})
 			end
 		end
 	end
@@ -981,6 +1064,80 @@ local Returns = table.freeze({
 				end
 			end
 		end
+	},
+	BuySkinRequest = {
+		on = function(Listener: (Player: Player, Value: string) -> ()): () -> ()
+			Events.Reliable[14] = Listener
+			for Index, Arguments in Queue.Reliable[14] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[14] = {}
+			return function (): ()
+				if Events.Reliable[14] == Listener then
+					Events.Reliable[14] = nil
+				end
+			end
+		end
+	},
+	EquipSkinRequest = {
+		on = function(Listener: (Player: Player, Value1: string, Value2: string?) -> ()): () -> ()
+			Events.Reliable[15] = Listener
+			for Index, Arguments in Queue.Reliable[15] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[15] = {}
+			return function (): ()
+				if Events.Reliable[15] == Listener then
+					Events.Reliable[15] = nil
+				end
+			end
+		end
+	},
+	SkinResult = {
+		fire = function(Player: Player, Value1: boolean, Value2: string, Value3: string?): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_SkinResult(Value1, Value2, Value3)
+			PlayersMap[Player] = Save()
+		end,
+		fireAll = function(Value1: boolean, Value2: string, Value3: string?): ()
+			Load()
+			WriteEVENT_SkinResult(Value1, Value2, Value3)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireList = function(List: {Player}, Value1: boolean, Value2: string, Value3: string?): ()
+			Load()
+			WriteEVENT_SkinResult(Value1, Value2, Value3)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireExcept = function(Except: Player, Value1: boolean, Value2: string, Value3: string?): ()
+			Load()
+			WriteEVENT_SkinResult(Value1, Value2, Value3)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
 	},
 })
 type BLINK_EVENTS_SYMBOL = typeof(Returns)

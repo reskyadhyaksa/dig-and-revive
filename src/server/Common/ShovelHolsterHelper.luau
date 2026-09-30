@@ -1,7 +1,9 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
 local ShovelTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"):WaitForChild("ShovelTypes"))
+local ShovelSkinConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Configs"):WaitForChild("ShovelSkinConfig"))
 
 type ShovelConfigType = ShovelTypes.ShovelConfig
 
@@ -32,14 +34,21 @@ function ShovelHolsterHelper.CreateFallbackTool(config: ShovelConfigType): Tool
 	return tool
 end
 
+-- Data only (attribute + tag); the client builds the skin visuals.
+function ShovelHolsterHelper.MarkSkin(target: Instance, skinId: string?)
+	CollectionService:AddTag(target, ShovelSkinConfig.RenderTag)
+	if target:GetAttribute(ShovelSkinConfig.SkinIdAttribute) ~= skinId then target:SetAttribute(ShovelSkinConfig.SkinIdAttribute, skinId) end
+end
+
 function ShovelHolsterHelper.GetOrCreateShovelAsset(config: ShovelConfigType): Tool
 	local asset = ShovelHolsterHelper.GetShovelAsset(config.assetName)
 	return if asset then asset:Clone() else ShovelHolsterHelper.CreateFallbackTool(config)
 end
 
-function ShovelHolsterHelper.AttachHolster(character: Model, torso: BasePart, config: ShovelConfigType, holsterName: string)
+function ShovelHolsterHelper.AttachHolster(character: Model, torso: BasePart, config: ShovelConfigType, holsterName: string, skinId: string?)
 	local holsterModel = Instance.new("Model")
 	holsterModel.Name = holsterName
+	ShovelHolsterHelper.MarkSkin(holsterModel, skinId)
 
 	local clonedTool = ShovelHolsterHelper.GetOrCreateShovelAsset(config)
 	for _, desc in clonedTool:GetDescendants() do

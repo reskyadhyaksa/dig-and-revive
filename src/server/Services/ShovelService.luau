@@ -23,12 +23,14 @@ local function UpdateHolster(player: Player, character: Model)
 		local holsterName = HOLSTER_TAG .. shovelId
 		local existing = character:FindFirstChild(holsterName)
 		local equipped = character:FindFirstChild(config.assetName) ~= nil
-		local inBackpack = backpack and backpack:FindFirstChild(config.assetName) ~= nil
+		local stored = if backpack then backpack:FindFirstChild(config.assetName) else nil
+		local skinId = if stored then stored:GetAttribute("SkinId") :: string? else nil
 
 		if equipped then
 			if existing then existing:Destroy() end
-		elseif inBackpack then
-			if not existing then ShovelHolsterHelper.AttachHolster(character, torso, config, holsterName) end
+		elseif stored then
+			if existing then ShovelHolsterHelper.MarkSkin(existing, skinId)
+			else ShovelHolsterHelper.AttachHolster(character, torso, config, holsterName, skinId) end
 		else
 			if existing then existing:Destroy() end
 		end
@@ -58,6 +60,10 @@ function ShovelService._OnPlayerAdded(player: Player)
 		local backpack = player:WaitForChild("Backpack", 5) :: Backpack?
 		ShovelLoadoutService.Apply(player)
 		cTrove:Connect(player:GetAttributeChangedSignal("OwnedShovels"), function() ShovelLoadoutService.Apply(player) end)
+		cTrove:Connect(player:GetAttributeChangedSignal("EquippedSkins"), function()
+			ShovelLoadoutService.Apply(player)
+			UpdateHolster(player, char)
+		end)
 
 		if backpack then
 			local function onChange()

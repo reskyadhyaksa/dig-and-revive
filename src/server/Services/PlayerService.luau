@@ -53,7 +53,7 @@ function PlayerService.GetEquippedShovelConfig(p: Player): ShovelConfigType?
 	local function checkTool(container: Instance?): ShovelConfigType?
 		if not container then return nil end
 		local tool = container:FindFirstChildWhichIsA("Tool")
-		return if tool then ShovelUtils.GetShovelConfig(tool.Name) else nil
+		return if tool then ShovelUtils.GetShovelConfig(ShovelUtils.ResolveToolShovelId(tool:GetAttribute("ShovelId"), tool.Name)) else nil
 	end
 	return checkTool(p.Character) or checkTool(p:FindFirstChildOfClass("Backpack")) or ShovelUtils.GetStarterShovel()
 end

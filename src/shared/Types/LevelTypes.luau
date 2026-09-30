@@ -15,6 +15,8 @@ export type PlayerProfileData = {
 	inventory: { InventoryItem }?,
 	ownedShovels: { [string]: boolean }?,
 	selectedShovel: string?,
+	ownedSkins: { [string]: boolean }?,
+	equippedSkins: { [string]: string }?, -- [shovelId] = skinId
 }
 
 export type PlayerStatsData = {

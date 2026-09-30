@@ -19,6 +19,8 @@ local ProfileTemplate: PlayerProfileData = {
 	discoveredIndex = {},
 	inventory = {},
 	ownedShovels = {},
+	ownedSkins = {},
+	equippedSkins = {},
 }
 
 local ProfileStore = ProfileService.GetProfileStore(

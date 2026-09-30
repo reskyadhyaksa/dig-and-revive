@@ -101,3 +101,24 @@ event SelectShovelRequest {
     Call: SingleAsync,
     Data: string(1..32),
 }
+
+event BuySkinRequest {
+    From: Client,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: string(1..32),
+}
+
+event EquipSkinRequest {
+    From: Client,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: (string(1..32), string(1..32)?),
+}
+
+event SkinResult {
+    From: Server,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: (boolean, string, string?),
+}

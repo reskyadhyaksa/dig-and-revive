@@ -7,6 +7,7 @@ local ShovelUtils = require(Shared:WaitForChild("Utils"):WaitForChild("ShovelUti
 local ShovelTypes = require(Shared:WaitForChild("Types"):WaitForChild("ShovelTypes"))
 local ShovelHolsterHelper = require(script.Parent.Parent:WaitForChild("Common"):WaitForChild("ShovelHolsterHelper"))
 local ShovelOwnershipRepository = require(script.Parent.Parent:WaitForChild("Repositories"):WaitForChild("ShovelOwnershipRepository"))
+local ShovelSkinService = require(script.Parent:WaitForChild("ShovelSkinService"))
 
 type ShovelConfigType = ShovelTypes.ShovelConfig
 
@@ -36,6 +37,12 @@ local function CreateTool(config: ShovelConfigType, parent: Instance): Tool
 	return tool
 end
 
+-- Skin is visual only: the server stamps SkinId, each client renders it (see ShovelSkinRenderController).
+local function StampSkin(tool: Tool?, skinId: string?)
+	if not tool then return end
+	ShovelHolsterHelper.MarkSkin(tool, skinId)
+end
+
 -- Removes non-selected shovels from character, backpack and StarterGear, then grants the selected one.
 function ShovelLoadoutService.Apply(player: Player): Tool?
 	local config = ShovelUtils.ResolveSelectedShovel(
@@ -52,7 +59,11 @@ function ShovelLoadoutService.Apply(player: Player): Tool?
 	if not tool and backpack then tool = CreateTool(config, backpack) end
 
 	local starterGear = player:FindFirstChild("StarterGear")
-	if starterGear and not Sweep(starterGear, config.assetName) then CreateTool(config, starterGear) end
+	local gearTool = if starterGear then Sweep(starterGear, config.assetName) or CreateTool(config, starterGear) else nil
+
+	local skinId = ShovelSkinService.GetSkinFor(player, config.id)
+	StampSkin(tool, skinId)
+	StampSkin(gearTool, skinId)
 	return tool
 end
 

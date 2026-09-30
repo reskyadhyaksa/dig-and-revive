@@ -27,4 +27,9 @@ function ShovelUtils.ResolveSelectedShovel(selectedId: string?, owned: { [string
 	return ShovelUtils.GetStarterShovel()
 end
 
+-- A tool's identity comes from its ShovelId attribute (skins never rename it); name is the legacy fallback.
+function ShovelUtils.ResolveToolShovelId(attributeValue: any, toolName: string): string
+	return if typeof(attributeValue) == "string" then attributeValue else toolName
+end
+
 return table.freeze(ShovelUtils)
