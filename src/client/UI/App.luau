@@ -1,6 +1,5 @@
 --!strict
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("React"))
 
@@ -18,6 +17,7 @@ local useAppSignals = require(script.Parent.Hooks.useAppSignals)
 local useCompass = require(script.Parent.Hooks.useCompass)
 local useNpcDialog = require(script.Parent.Hooks.useNpcDialog)
 local DefaultInventoryHelper = require(script.Parent.Common.DefaultInventoryHelper)
+local ToolToggleHelper = require(script.Parent.Common.ToolToggleHelper)
 local DigNetwork = require(script.Parent.Parent:WaitForChild("Network"):WaitForChild("DigNetwork"))
 local InventoryTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"):WaitForChild("InventoryTypes"))
 
@@ -27,27 +27,6 @@ local function GetAllItems(savedItems: { InventoryItem }?): { InventoryItem }
 	local combined: { InventoryItem } = table.clone(savedItems or {})
 	for _, shovel in ipairs(DefaultInventoryHelper.GetClientShovelItems()) do table.insert(combined, shovel) end
 	return combined
-end
-
-local function HandleEquipToggle(item: InventoryItem)
-	local p = Players.LocalPlayer
-	local char = if p then p.Character else nil
-	local bp = if p then p:FindFirstChildOfClass("Backpack") else nil
-	local hum = if char then char:FindFirstChildOfClass("Humanoid") else nil
-	if not p or not char then return end
-
-	if item.category == "Shovel" then
-		local toolName = item.templateId or item.displayName
-		local inChar = char:FindFirstChild(toolName) or char:FindFirstChildWhichIsA("Tool")
-		local inBp = if bp then (bp:FindFirstChild(toolName) or bp:FindFirstChildWhichIsA("Tool")) else nil
-		if inChar then
-			if hum then hum:UnequipTools() else inChar.Parent = bp end
-		elseif inBp then
-			if hum then hum:EquipTool(inBp) else inBp.Parent = char end
-		end
-	else
-		DigNetwork.EquipItemRequest.fire(item.id)
-	end
 end
 
 local function App(): any
@@ -108,7 +87,7 @@ local function App(): any
 		Inventory = if invOpen then React.createElement(InventoryModal, {
 			visible = true, items = GetAllItems(state.inventoryItems), playerLevel = state.stats.level or 1,
 			defaultTab = invTab, onClose = function() setInvOpen(false) end,
-			onOpenCodex = function() setIndexOpen(true) setInvOpen(false) end, onEquipToggle = HandleEquipToggle,
+			onOpenCodex = function() setIndexOpen(true) setInvOpen(false) end, onEquipToggle = ToolToggleHelper.ToggleInventoryItem,
 		}) else nil,
 		Index = if indexOpen then React.createElement(IndexModal, {
 			visible = true, indexData = state.indexData, onClose = function() setIndexOpen(false) end,

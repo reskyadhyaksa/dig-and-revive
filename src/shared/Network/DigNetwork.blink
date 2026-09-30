@@ -73,3 +73,31 @@ event SellResult {
     Call: SingleAsync,
     Data: (boolean, u32, u16, string?),
 }
+
+event ToggleFavoriteRequest {
+    From: Client,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: string,
+}
+
+event BuyShovelRequest {
+    From: Client,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: string(1..32),
+}
+
+event BuyShovelResult {
+    From: Server,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: (boolean, string, string?),
+}
+
+event SelectShovelRequest {
+    From: Client,
+    Type: Reliable,
+    Call: SingleAsync,
+    Data: string(1..32),
+}

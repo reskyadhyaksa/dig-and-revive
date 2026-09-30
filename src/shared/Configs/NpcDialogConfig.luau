@@ -31,6 +31,11 @@ local NpcDialogConfig: { [string]: DialogTree } = {
 			NoHeldItem = "Hold the fossil you want to sell first.",
 			TooFar = "Come closer, I can't hear you!",
 			Unsellable = "I can't buy that one.",
+			Favorited = "That one's a favorite! Unfavorite it first if you really want to sell it.",
+		},
+		resultOptions = {
+			All = { { label = "OK", action = "Close" } },
+			Held = { { label = "Back", next = "greet" }, { label = "Bye!", action = "Close" } },
 		},
 	},
 }

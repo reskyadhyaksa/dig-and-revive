@@ -162,6 +162,9 @@ Queue.Reliable[0] = table.create(256)
 Queue.Reliable[2] = table.create(256)
 Queue.Reliable[7] = table.create(256)
 Queue.Reliable[8] = table.create(256)
+Queue.Reliable[10] = table.create(256)
+Queue.Reliable[11] = table.create(256)
+Queue.Reliable[13] = table.create(256)
 export type SellMode = ("All" | "Held")
 local function ReadEVENT_StartDigRequest(): (number, string)
 	-- Read BLOCK: 10 bytes
@@ -288,6 +291,54 @@ local function WriteEVENT_SellResult(Value1: boolean, Value2: number, Value3: nu
 	end
 end
 
+local function ReadEVENT_ToggleFavoriteRequest(): (string)
+	-- Read BLOCK: 2 bytes
+	local BLOCK_START = Read(2)
+	local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
+	local Value = buffer.readstring(RecieveBuffer, Read(Length), Length)
+	return Value
+end
+
+local function ReadEVENT_BuyShovelRequest(): (string)
+	-- Read BLOCK: 1 bytes
+	local BLOCK_START = Read(1)
+	local Length = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+	local Value = buffer.readstring(RecieveBuffer, Read(Length), Length)
+	if #Value < 1 then error(`Expected length of "Value" to be larger than 1, got {#Value} instead.`) end
+	if #Value > 32 then error(`Expected length of "Value" to be smaller than 32, got {#Value} instead.`) end
+	return Value
+end
+
+local function WriteEVENT_BuyShovelResult(Value1: boolean, Value2: string, Value3: string?): ()
+	-- Allocate BLOCK: 5 bytes
+	local BLOCK_START = Allocate(5)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 12)
+	buffer.writeu8(SendBuffer, BLOCK_START + 1, Value1 and 1 or 0)
+	local Length = #Value2
+	buffer.writeu16(SendBuffer, BLOCK_START + 2, Length)
+	Allocate(Length)
+	buffer.writestring(SendBuffer, SendOffset, Value2, Length)
+	buffer.writeu8(SendBuffer, BLOCK_START + 4, Value3 ~= nil and 1 or 0)
+	if Value3 ~= nil then
+		-- Allocate BLOCK: 2 bytes
+		local BLOCK_START = Allocate(2)
+		local Length = #Value3
+		buffer.writeu16(SendBuffer, BLOCK_START + 0, Length)
+		Allocate(Length)
+		buffer.writestring(SendBuffer, SendOffset, Value3, Length)
+	end
+end
+
+local function ReadEVENT_SelectShovelRequest(): (string)
+	-- Read BLOCK: 1 bytes
+	local BLOCK_START = Read(1)
+	local Length = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+	local Value = buffer.readstring(RecieveBuffer, Read(Length), Length)
+	if #Value < 1 then error(`Expected length of "Value" to be larger than 1, got {#Value} instead.`) end
+	if #Value > 32 then error(`Expected length of "Value" to be smaller than 32, got {#Value} instead.`) end
+	return Value
+end
+
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
@@ -338,6 +389,21 @@ if not RunService:IsRunning() then
 		fireAll = NOOP,
 		fireList = NOOP,
 		fireExcept = NOOP
+	},
+	ToggleFavoriteRequest = {
+		on = NOOP
+	},
+	BuyShovelRequest = {
+		on = NOOP
+	},
+	BuyShovelResult = {
+		fire = NOOP,
+		fireAll = NOOP,
+		fireList = NOOP,
+		fireExcept = NOOP
+	},
+	SelectShovelRequest = {
+		on = NOOP
 	},
 	})
 	return Returns :: BLINK_EVENTS_SYMBOL
@@ -440,6 +506,36 @@ Reliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instance
 					warn("[Blink]: Event queue of \"SellRequest\" exceeded 256, did you forget to implement a listener?")
 				end
 				table.insert(Queue.Reliable[8], {Player, Value} :: {any})
+			end
+		elseif Index == 10 then
+			local Value: string = ReadEVENT_ToggleFavoriteRequest()
+			if Events.Reliable[10] ~= nil then
+				task.spawn(Events.Reliable[10], Player, Value)
+			else
+				if #Queue.Reliable[10] > 256 then
+					warn("[Blink]: Event queue of \"ToggleFavoriteRequest\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[10], {Player, Value} :: {any})
+			end
+		elseif Index == 11 then
+			local Value: string = ReadEVENT_BuyShovelRequest()
+			if Events.Reliable[11] ~= nil then
+				task.spawn(Events.Reliable[11], Player, Value)
+			else
+				if #Queue.Reliable[11] > 256 then
+					warn("[Blink]: Event queue of \"BuyShovelRequest\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[11], {Player, Value} :: {any})
+			end
+		elseif Index == 13 then
+			local Value: string = ReadEVENT_SelectShovelRequest()
+			if Events.Reliable[13] ~= nil then
+				task.spawn(Events.Reliable[13], Player, Value)
+			else
+				if #Queue.Reliable[13] > 256 then
+					warn("[Blink]: Event queue of \"SelectShovelRequest\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[13], {Player, Value} :: {any})
 			end
 		end
 	end
@@ -797,6 +893,94 @@ local Returns = table.freeze({
 				PlayersMap[Player] = Save()
 			end
 		end,
+	},
+	ToggleFavoriteRequest = {
+		on = function(Listener: (Player: Player, Value: string) -> ()): () -> ()
+			Events.Reliable[10] = Listener
+			for Index, Arguments in Queue.Reliable[10] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[10] = {}
+			return function (): ()
+				if Events.Reliable[10] == Listener then
+					Events.Reliable[10] = nil
+				end
+			end
+		end
+	},
+	BuyShovelRequest = {
+		on = function(Listener: (Player: Player, Value: string) -> ()): () -> ()
+			Events.Reliable[11] = Listener
+			for Index, Arguments in Queue.Reliable[11] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[11] = {}
+			return function (): ()
+				if Events.Reliable[11] == Listener then
+					Events.Reliable[11] = nil
+				end
+			end
+		end
+	},
+	BuyShovelResult = {
+		fire = function(Player: Player, Value1: boolean, Value2: string, Value3: string?): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_BuyShovelResult(Value1, Value2, Value3)
+			PlayersMap[Player] = Save()
+		end,
+		fireAll = function(Value1: boolean, Value2: string, Value3: string?): ()
+			Load()
+			WriteEVENT_BuyShovelResult(Value1, Value2, Value3)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireList = function(List: {Player}, Value1: boolean, Value2: string, Value3: string?): ()
+			Load()
+			WriteEVENT_BuyShovelResult(Value1, Value2, Value3)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		fireExcept = function(Except: Player, Value1: boolean, Value2: string, Value3: string?): ()
+			Load()
+			WriteEVENT_BuyShovelResult(Value1, Value2, Value3)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+	},
+	SelectShovelRequest = {
+		on = function(Listener: (Player: Player, Value: string) -> ()): () -> ()
+			Events.Reliable[13] = Listener
+			for Index, Arguments in Queue.Reliable[13] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[13] = {}
+			return function (): ()
+				if Events.Reliable[13] == Listener then
+					Events.Reliable[13] = nil
+				end
+			end
+		end
 	},
 })
 type BLINK_EVENTS_SYMBOL = typeof(Returns)

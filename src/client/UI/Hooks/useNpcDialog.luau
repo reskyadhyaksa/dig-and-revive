@@ -23,6 +23,7 @@ export type NpcDialogState = {
 }
 
 type ResultState = { ok: boolean, coins: number, reason: string? }
+type SellMode = DialogTypes.SellMode
 
 local EMPTY_OPTIONS: { DialogOption } = {}
 
@@ -30,6 +31,7 @@ local function useNpcDialog(inventoryItems: { InventoryItem }): NpcDialogState
 	local npcKey, setNpcKey = React.useState(nil :: string?)
 	local nodeId, setNodeId = React.useState("")
 	local result, setResult = React.useState(nil :: ResultState?)
+	local sellMode = React.useRef("Held" :: SellMode)
 
 	local tree = if npcKey then NpcDialogConfig[npcKey] else nil
 
@@ -53,8 +55,8 @@ local function useNpcDialog(inventoryItems: { InventoryItem }): NpcDialogState
 
 	local onOption = React.useCallback(function(option: DialogOption)
 		if option.action == "Close" then NpcInteractController.CloseDialog() return end
-		if option.action == "SellAll" then DigNetwork.SellRequest.fire("All") return end
-		if option.action == "SellHeld" then DigNetwork.SellRequest.fire("Held") return end
+		if option.action == "SellAll" then sellMode.current = "All" DigNetwork.SellRequest.fire("All") return end
+		if option.action == "SellHeld" then sellMode.current = "Held" DigNetwork.SellRequest.fire("Held") return end
 		if option.next then setNodeId(option.next) setResult(nil) end
 	end, {})
 
@@ -68,7 +70,7 @@ local function useNpcDialog(inventoryItems: { InventoryItem }): NpcDialogState
 		return {
 			isOpen = true, npcName = tree.npcName, onOption = onOption,
 			text = SellUtils.FormatText(template, { price = result.coins }),
-			options = { { label = "Back", next = tree.start }, { label = "Bye!", action = "Close" } },
+			options = tree.resultOptions[sellMode.current] or tree.resultOptions.Held,
 		}
 	end
 

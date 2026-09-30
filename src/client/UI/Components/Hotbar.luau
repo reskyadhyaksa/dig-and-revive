@@ -10,6 +10,7 @@ local HotbarTheme = require(script.Parent.Parent.Common.HotbarTheme)
 local useDeviceType = require(script.Parent.Parent.Hooks.useDeviceType)
 local HotbarButton = require(script.Parent.HotbarButton)
 local HotbarItemSlot = require(script.Parent.HotbarItemSlot)
+local ToolToggleHelper = require(script.Parent.Parent.Common.ToolToggleHelper)
 local InventoryTypes = require(ReplicatedStorage.Shared.Types.InventoryTypes)
 
 type InventoryItem = InventoryTypes.InventoryItem
@@ -23,32 +24,6 @@ export type Props = {
 	onRemoveSlotItem: ((item: InventoryItem) -> ())?,
 }
 
-local function ToggleToolByUniqueId(item: InventoryItem?)
-	local p = Players.LocalPlayer
-	local char = if p then p.Character else nil
-	local bp = if p then p:FindFirstChildOfClass("Backpack") else nil
-	local hum = if char then char:FindFirstChildOfClass("Humanoid") else nil
-	if not p or not char or not hum or not bp then return end
-
-	if item then
-		local heldInChar: Tool? = nil
-		for _, child in ipairs(char:GetChildren()) do
-			if child:IsA("Tool") and child:GetAttribute("UniqueId") == item.id then heldInChar = child break end
-		end
-		if heldInChar then hum:UnequipTools() else
-			for _, child in ipairs(bp:GetChildren()) do
-				if child:IsA("Tool") and child:GetAttribute("UniqueId") == item.id then hum:EquipTool(child) break end
-			end
-		end
-	else
-		local tool = char:FindFirstChildWhichIsA("Tool")
-		if tool then hum:UnequipTools() else
-			local shovel = bp:FindFirstChildWhichIsA("Tool")
-			if shovel then hum:EquipTool(shovel) end
-		end
-	end
-end
-
 local function Hotbar(props: Props): any
 	local isMobile = useDeviceType().isMobile
 	local items = props.equippedItems or {}
@@ -56,10 +31,10 @@ local function Hotbar(props: Props): any
 	local baseWidth = if isMobile then math.clamp(0.12 * totalButtons + 0.1, 0.45, 0.95) else math.clamp(0.08 * totalButtons + 0.08, 0.35, 0.65)
 	local minWidth = if isMobile then 70 * totalButtons + 20 else 80 * totalButtons + 20
 
-	local handleEquip = props.onEquipShovel or function() ToggleToolByUniqueId(nil) end
+	local handleEquip = props.onEquipShovel or function() ToolToggleHelper.Toggle(nil) end
 	local handleSelect = props.onSelectShovel or function() end
 	local handleInv = props.onOpenInventory or function() end
-	local handleSelectSlot = props.onSelectSlotItem or function(it) ToggleToolByUniqueId(it) end
+	local handleSelectSlot = props.onSelectSlotItem or function(it) ToolToggleHelper.Toggle(it) end
 	local handleRemoveSlot = props.onRemoveSlotItem or function() end
 
 	React.useEffect(function()

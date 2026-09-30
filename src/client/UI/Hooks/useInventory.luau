@@ -5,6 +5,7 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("R
 
 local InventoryUtils = require(ReplicatedStorage.Shared.Utils.InventoryUtils)
 local InventoryTypes = require(ReplicatedStorage.Shared.Types.InventoryTypes)
+local DigNetwork = require(script.Parent.Parent.Parent:WaitForChild("Network"):WaitForChild("DigNetwork"))
 
 type InventoryItem = InventoryTypes.InventoryItem
 type ItemCategory = InventoryTypes.ItemCategory
@@ -50,7 +51,9 @@ local function useInventory(props: UseInventoryProps)
 		setSelectedItem(item)
 	end, {})
 
+	-- Optimistic local flip for instant feedback; the server owns the saved flag used by selling.
 	local handleToggleFavorite = React.useCallback(function(item: InventoryItem)
+		DigNetwork.ToggleFavoriteRequest.fire(item.id)
 		setFavorites(function(prev)
 			local next = table.clone(prev)
 			local current = if next[item.id] ~= nil then next[item.id] else (item.isFavorite == true)

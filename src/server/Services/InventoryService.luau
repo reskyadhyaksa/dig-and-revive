@@ -7,6 +7,8 @@ local Trove = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("T
 local DigNetwork = require(script.Parent.Parent:WaitForChild("Network"):WaitForChild("DigNetwork"))
 local InventoryRepository = require(script.Parent.Parent:WaitForChild("Repositories"):WaitForChild("InventoryRepository"))
 local ItemToolHelper = require(script.Parent.Parent:WaitForChild("Common"):WaitForChild("ItemToolHelper"))
+local InventoryFavoriteRepository = require(script.Parent.Parent:WaitForChild("Repositories"):WaitForChild("InventoryFavoriteRepository"))
+local ToolRemovalHelper = require(script.Parent.Parent:WaitForChild("Common"):WaitForChild("ToolRemovalHelper"))
 local InventoryTypes = require(ReplicatedStorage.Shared.Types.InventoryTypes)
 
 type InventoryItem = InventoryTypes.InventoryItem
@@ -15,20 +17,7 @@ local InventoryService = {}
 local _trove = Trove.new()
 local MAX_HOTBAR_ITEMS = 4
 
-local function RemoveToolByUniqueId(player: Player, uniqueId: string)
-	local char = player.Character
-	local bp = player:FindFirstChildOfClass("Backpack")
-	local function check(parent: Instance?)
-		if not parent then return end
-		for _, child in ipairs(parent:GetChildren()) do
-			if child:IsA("Tool") and child:GetAttribute("UniqueId") == uniqueId then
-				child:Destroy()
-			end
-		end
-	end
-	check(char)
-	check(bp)
-end
+local RemoveToolByUniqueId = ToolRemovalHelper.RemoveByUniqueId
 
 local function GetEquippedCount(player: Player): ({ InventoryItem }, number)
 	local items = InventoryRepository.GetInventory(player)
@@ -63,6 +52,10 @@ function InventoryService.Init()
 			local tool = ItemToolHelper.CreateItemTool(item)
 			tool.Parent = bp or char
 		end
+	end)
+
+	DigNetwork.ToggleFavoriteRequest.on(function(player: Player, uniqueId: string)
+		InventoryFavoriteRepository.ToggleFavorite(player, uniqueId)
 	end)
 
 	_trove:Connect(Players.PlayerRemoving, function(player)

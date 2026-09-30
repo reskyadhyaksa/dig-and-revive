@@ -15,6 +15,7 @@ local CompassController = require(script.Controllers.CompassController)
 local RevivalController = require(script.Controllers.RevivalController)
 local NpcInteractController = require(script.Controllers.NpcInteractController)
 local DialogCameraController = require(script.Controllers.DialogCameraController)
+local ShovelShopController = require(script.Controllers.ShovelShopController)
 local App = require(script.UI.App)
 
 local StarterGui = game:GetService("StarterGui")
@@ -41,6 +42,7 @@ CompassController.Init()
 RevivalController.Init()
 NpcInteractController.Init()
 DialogCameraController.Init()
+ShovelShopController.Init()
 
 -- 2. Mount React UI
 local root = ReactRoblox.createRoot(Instance.new("Folder"))

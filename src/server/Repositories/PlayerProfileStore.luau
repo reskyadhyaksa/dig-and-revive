@@ -18,6 +18,7 @@ local ProfileTemplate: PlayerProfileData = {
 	coins = 0,
 	discoveredIndex = {},
 	inventory = {},
+	ownedShovels = {},
 }
 
 local ProfileStore = ProfileService.GetProfileStore(
@@ -87,6 +88,13 @@ function PlayerProfileStore.AddCoins(player: Player, amount: number): number
 		return profile.Data.coins
 	end
 	return 0
+end
+
+function PlayerProfileStore.TrySpendCoins(player: Player, amount: number): boolean
+	local profile = _profiles[player]
+	if profile == nil or amount < 0 or profile.Data.coins < amount then return false end
+	profile.Data.coins -= amount
+	return true
 end
 
 function PlayerProfileStore.GetCoins(player: Player): number

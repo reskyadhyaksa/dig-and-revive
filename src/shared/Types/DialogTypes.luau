@@ -18,6 +18,8 @@ export type DialogTree = {
 	start: string,
 	nodes: { [string]: DialogNode },
 	results: { [string]: string },
+	-- Buttons shown on the result screen, keyed by the SellMode that produced it.
+	resultOptions: { [string]: { DialogOption } },
 }
 
 export type SellMode = "All" | "Held"

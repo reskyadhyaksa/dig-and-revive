@@ -13,6 +13,8 @@ export type PlayerProfileData = {
 	coins: number,
 	discoveredIndex: PlayerIndexData?,
 	inventory: { InventoryItem }?,
+	ownedShovels: { [string]: boolean }?,
+	selectedShovel: string?,
 }
 
 export type PlayerStatsData = {

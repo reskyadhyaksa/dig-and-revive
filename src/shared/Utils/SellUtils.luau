@@ -18,11 +18,11 @@ function SellUtils.IsSellable(item: InventoryItem): boolean
 	return not SellConfig.UnsellableCategories[item.category]
 end
 
--- Sell-all skips favorites and hotbar-equipped items to prevent accidental loss.
+-- Sell-all includes hotbar-equipped items; only favorites are protected from bulk selling.
 function SellUtils.FilterSellAll(items: { InventoryItem }): { InventoryItem }
 	local result: { InventoryItem } = {}
 	for _, item in ipairs(items) do
-		if SellUtils.IsSellable(item) and not item.isFavorite and not item.isEquipped then
+		if SellUtils.IsSellable(item) and not item.isFavorite then
 			table.insert(result, item)
 		end
 	end

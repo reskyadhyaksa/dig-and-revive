@@ -13,6 +13,7 @@ local DigNetwork = require(script.Parent.Parent:WaitForChild("Network"):WaitForC
 local PlayerProfileStore = require(script.Parent.Parent:WaitForChild("Repositories"):WaitForChild("PlayerProfileStore"))
 local IndexRepository = require(script.Parent.Parent:WaitForChild("Repositories"):WaitForChild("IndexRepository"))
 local InventoryRepository = require(script.Parent.Parent:WaitForChild("Repositories"):WaitForChild("InventoryRepository"))
+local ShovelOwnershipRepository = require(script.Parent.Parent:WaitForChild("Repositories"):WaitForChild("ShovelOwnershipRepository"))
 
 type ExpRewardResult = LevelTypes.ExpRewardResult
 type ShovelConfigType = ShovelTypes.ShovelConfig
@@ -86,6 +87,7 @@ function PlayerService.SyncPlayerStats(p: Player)
 	p:SetAttribute("Coins", data.coins or 0)
 	IndexRepository.GetPlayerIndex(p)
 	InventoryRepository.GetInventory(p)
+	ShovelOwnershipRepository.GetOwned(p)
 	DigNetwork.PlayerStatsSync.fire(p, data.level, data.exp, requiredExp, data.coins or 0, luck)
 end
 

@@ -7,6 +7,7 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("R
 
 local ZoneController = require(script.Parent.Parent.Parent:WaitForChild("Controllers"):WaitForChild("ZoneController"))
 local DigController = require(script.Parent.Parent.Parent:WaitForChild("Controllers"):WaitForChild("DigController"))
+local ShovelShopController = require(script.Parent.Parent.Parent:WaitForChild("Controllers"):WaitForChild("ShovelShopController"))
 local IndexTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"):WaitForChild("IndexTypes"))
 local InventoryTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"):WaitForChild("InventoryTypes"))
 
@@ -56,6 +57,13 @@ local function useAppSignals(): AppState
 			end
 		end)
 
+		local shopConn = ShovelShopController.PurchaseResult:Connect(function(ok, _shovelId, message)
+			if timer then task.cancel(timer) end
+			setNotif({ title = message, subtitle = if ok then "PURCHASED" else "CANNOT BUY", visible = true,
+				themeColor = if ok then Color3.fromRGB(46, 204, 113) else Color3.fromRGB(231, 76, 60) })
+			timer = task.delay(3.0, function() setNotif(function(p) return { title = p.title, subtitle = p.subtitle, visible = false, themeColor = p.themeColor } end) end)
+		end)
+
 		local pConn = DigController.PowerBarStateChanged:Connect(function(vis, pwr) setPower({ visible = vis, power = pwr }) end)
 		local mConn = DigController.MinigameStateChanged:Connect(function(vis, prog, rem) setMinigame({ visible = vis, progress = prog, remainingTime = rem }) end)
 		local sConn = DigController.PlayerStatsChanged:Connect(function(lvl, exp, req, coins, luck)
@@ -72,6 +80,7 @@ local function useAppSignals(): AppState
 
 		return function()
 			zConn:Disconnect()
+			shopConn:Disconnect()
 			pConn:Disconnect()
 			mConn:Disconnect()
 			sConn:Disconnect()

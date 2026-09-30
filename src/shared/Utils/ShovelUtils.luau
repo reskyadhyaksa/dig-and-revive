@@ -20,4 +20,11 @@ function ShovelUtils.GetStarterShovel(): ShovelConfigType?
 	return nil
 end
 
+-- Returns the selected shovel if the player may use it, otherwise the starter shovel.
+function ShovelUtils.ResolveSelectedShovel(selectedId: string?, owned: { [string]: boolean }): ShovelConfigType?
+	local config = if selectedId then ShovelConfig[selectedId] else nil
+	if config and (config.isStarter or owned[config.id] == true) then return config end
+	return ShovelUtils.GetStarterShovel()
+end
+
 return table.freeze(ShovelUtils)

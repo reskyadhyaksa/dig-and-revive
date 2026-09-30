@@ -6,11 +6,8 @@ local Trove = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("T
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ShovelConfig = require(Shared:WaitForChild("Configs"):WaitForChild("ShovelConfig"))
-local ShovelUtils = require(Shared:WaitForChild("Utils"):WaitForChild("ShovelUtils"))
-local ShovelTypes = require(Shared:WaitForChild("Types"):WaitForChild("ShovelTypes"))
 local ShovelHolsterHelper = require(script.Parent.Parent:WaitForChild("Common"):WaitForChild("ShovelHolsterHelper"))
-
-type ShovelConfigType = ShovelTypes.ShovelConfig
+local ShovelLoadoutService = require(script.Parent:WaitForChild("ShovelLoadoutService"))
 
 local ShovelService = {}
 local _trove = Trove.new()
@@ -38,23 +35,6 @@ local function UpdateHolster(player: Player, character: Model)
 	end
 end
 
-local function EnsureStarterShovel(player: Player, character: Model, config: ShovelConfigType)
-	local backpack = player:WaitForChild("Backpack", 5) :: Backpack?
-	if not backpack then return end
-	if backpack:FindFirstChild(config.assetName) or character:FindFirstChild(config.assetName) then return end
-
-	local tool = ShovelHolsterHelper.GetOrCreateShovelAsset(config)
-	tool:SetAttribute("ShovelId", config.id)
-	tool.Parent = backpack
-
-	local starterGear = player:FindFirstChild("StarterGear")
-	if starterGear and not starterGear:FindFirstChild(config.assetName) then
-		local sgTool = ShovelHolsterHelper.GetOrCreateShovelAsset(config)
-		sgTool:SetAttribute("ShovelId", config.id)
-		sgTool.Parent = starterGear
-	end
-end
-
 function ShovelService.Init()
 	_trove:Connect(Players.PlayerAdded, function(p) ShovelService._OnPlayerAdded(p) end)
 	_trove:Connect(Players.PlayerRemoving, function(p)
@@ -75,10 +55,10 @@ function ShovelService._OnPlayerAdded(player: Player)
 		local hum = char:WaitForChild("Humanoid", 10) :: Humanoid?
 		if hum then cTrove:Connect(hum.Died, function() cTrove:Clean() end) end
 
-		local starter = ShovelUtils.GetStarterShovel()
-		if starter then EnsureStarterShovel(player, char, starter) end
-
 		local backpack = player:WaitForChild("Backpack", 5) :: Backpack?
+		ShovelLoadoutService.Apply(player)
+		cTrove:Connect(player:GetAttributeChangedSignal("OwnedShovels"), function() ShovelLoadoutService.Apply(player) end)
+
 		if backpack then
 			local function onChange()
 				UpdateHolster(player, char)
