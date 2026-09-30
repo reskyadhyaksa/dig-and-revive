@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ShovelUtils = require(Shared:WaitForChild("Utils"):WaitForChild("ShovelUtils"))
 local InventoryTypes = require(Shared:WaitForChild("Types"):WaitForChild("InventoryTypes"))
+local SkinInventoryHelper = require(script.Parent.SkinInventoryHelper)
 
 type InventoryItem = InventoryTypes.InventoryItem
 
@@ -30,7 +31,8 @@ function DefaultInventoryHelper.GetClientShovelItems(): { InventoryItem }
 	local char = if player then player.Character else nil
 
 	local items: { InventoryItem } = {}
-	for _, shovelId in GetOwnedShovelIds() do
+	local ownedIds = GetOwnedShovelIds()
+	for _, shovelId in ownedIds do
 		local config = ShovelUtils.GetShovelConfig(shovelId)
 		if not config then continue end
 		local shovelItem: InventoryItem = {
@@ -55,6 +57,7 @@ function DefaultInventoryHelper.GetClientShovelItems(): { InventoryItem }
 		table.insert(items, shovelItem)
 	end
 
+	for _, skinItem in SkinInventoryHelper.GetSkinItems(ownedIds) do table.insert(items, skinItem) end
 	return items
 end
 

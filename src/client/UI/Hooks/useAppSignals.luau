@@ -8,6 +8,7 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("R
 local ZoneController = require(script.Parent.Parent.Parent:WaitForChild("Controllers"):WaitForChild("ZoneController"))
 local DigController = require(script.Parent.Parent.Parent:WaitForChild("Controllers"):WaitForChild("DigController"))
 local ShovelShopController = require(script.Parent.Parent.Parent:WaitForChild("Controllers"):WaitForChild("ShovelShopController"))
+local ShovelSkinShopController = require(script.Parent.Parent.Parent:WaitForChild("Controllers"):WaitForChild("ShovelSkinShopController"))
 local IndexTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"):WaitForChild("IndexTypes"))
 local InventoryTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"):WaitForChild("InventoryTypes"))
 
@@ -64,6 +65,13 @@ local function useAppSignals(): AppState
 			timer = task.delay(3.0, function() setNotif(function(p) return { title = p.title, subtitle = p.subtitle, visible = false, themeColor = p.themeColor } end) end)
 		end)
 
+		local skinConn = ShovelSkinShopController.SkinResult:Connect(function(ok, message)
+			if timer then task.cancel(timer) end
+			setNotif({ title = message, subtitle = if ok then "SKIN" else "SKIN UNAVAILABLE", visible = true,
+				themeColor = if ok then Color3.fromRGB(155, 89, 182) else Color3.fromRGB(231, 76, 60) })
+			timer = task.delay(3.0, function() setNotif(function(p) return { title = p.title, subtitle = p.subtitle, visible = false, themeColor = p.themeColor } end) end)
+		end)
+
 		local pConn = DigController.PowerBarStateChanged:Connect(function(vis, pwr) setPower({ visible = vis, power = pwr }) end)
 		local mConn = DigController.MinigameStateChanged:Connect(function(vis, prog, rem) setMinigame({ visible = vis, progress = prog, remainingTime = rem }) end)
 		local sConn = DigController.PlayerStatsChanged:Connect(function(lvl, exp, req, coins, luck)
@@ -81,6 +89,7 @@ local function useAppSignals(): AppState
 		return function()
 			zConn:Disconnect()
 			shopConn:Disconnect()
+			skinConn:Disconnect()
 			pConn:Disconnect()
 			mConn:Disconnect()
 			sConn:Disconnect()

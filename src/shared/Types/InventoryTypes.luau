@@ -30,6 +30,7 @@ export type InventoryItem = {
 	isFavorite: boolean?,
 	obtainedAt: number?,
 	stats: { ItemStat }?,
+	skinTargetShovel: string?, -- Set on skin entries: the ShovelId the skin is applied to
 }
 
 export type TabConfig = {

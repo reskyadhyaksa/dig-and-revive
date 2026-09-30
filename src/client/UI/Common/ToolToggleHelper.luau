@@ -47,7 +47,10 @@ function ToolToggleHelper.ToggleInventoryItem(item: InventoryItem)
 	local hum = if char then char:FindFirstChildOfClass("Humanoid") else nil
 	if not p or not char then return end
 
-	if item.category == "Shovel" then
+	if item.skinTargetShovel then
+		-- Wear this skin, or fall back to the default model when it is already worn.
+		DigNetwork.EquipSkinRequest.fire(item.skinTargetShovel, if item.isEquipped then nil else item.templateId)
+	elseif item.category == "Shovel" then
 		local toolName = item.templateId or item.displayName
 		local inChar = char:FindFirstChild(toolName)
 		local inBp = if bp then bp:FindFirstChild(toolName) else nil

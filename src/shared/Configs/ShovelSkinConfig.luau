@@ -14,6 +14,17 @@ local Skins: { [string]: ShovelSkinConfig } = {
 		requiredLevel = 1,
 		gripOffset = CFrame.new(0, 0, 0),
 	},
+
+	-- Test skin using the Tool-format asset already in Assets.ShovelSkins (free = owned by everyone).
+	["ClassicWood"] = {
+		id = "ClassicWood",
+		displayName = "Classic Wood",
+		assetName = "WoodenShovel1",
+		compatibleShovels = { "IronShovel" },
+		price = 0,
+		requiredLevel = 1,
+		gripOffset = CFrame.identity,
+	},
 }
 
 local ShovelSkinConfig = {

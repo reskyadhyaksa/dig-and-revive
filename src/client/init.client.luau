@@ -16,6 +16,8 @@ local RevivalController = require(script.Controllers.RevivalController)
 local NpcInteractController = require(script.Controllers.NpcInteractController)
 local DialogCameraController = require(script.Controllers.DialogCameraController)
 local ShovelShopController = require(script.Controllers.ShovelShopController)
+local ShovelSkinShopController = require(script.Controllers.ShovelSkinShopController)
+local ShovelSkinRenderController = require(script.Controllers.ShovelSkinRenderController)
 local App = require(script.UI.App)
 
 local StarterGui = game:GetService("StarterGui")
@@ -43,6 +45,8 @@ RevivalController.Init()
 NpcInteractController.Init()
 DialogCameraController.Init()
 ShovelShopController.Init()
+ShovelSkinShopController.Init()
+ShovelSkinRenderController.Init()
 
 -- 2. Mount React UI
 local root = ReactRoblox.createRoot(Instance.new("Folder"))
