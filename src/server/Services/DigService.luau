@@ -23,7 +23,7 @@ type DropItem = DropTypes.DropItem
 local DigService = {}
 local _trove = Trove.new()
 local _playerLastDigEndTime: { [Player]: number } = {}
-local _forcedNextTier: { [Player]: string } = {}
+local _forcedNextTier: { [Player]: string? } = {}
 
 local function SendFail(p: Player, msg: string)
 	DigNetwork.MinigameComplete.fire(p, false, nil, 0, 0, PlayerService.GetPlayerLevel(p), PlayerService.GetPlayerExp(p), msg)
