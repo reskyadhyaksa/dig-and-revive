@@ -46,7 +46,7 @@ local function CompassSideButton(props: Props): any
 				setIsHovered(false)
 				setIsPressed(false)
 			end,
-			[React.Event.Activated] = props.onActivated,
+			[React.Event.Activated] = props.onActivated or function() end,
 		}, {
 			Plate = UIBuilder.BevelPlate({
 				shadowColor = shadowColor,

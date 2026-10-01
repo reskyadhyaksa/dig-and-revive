@@ -50,14 +50,14 @@ local function HotbarItemSlot(props: Props): any
 				shadowYScale = 0.6,
 				faceColor = rarityColor:Lerp(Color3.new(1, 1, 1), if props.isHeld then 0.4 else 0.55),
 				borderColor = if props.isHeld then Color3.fromRGB(255, 255, 255) else rarityColor:Lerp(Color3.new(0, 0, 0), 0.25),
-				borderThickness = if props.isHeld then 2.8 else 2.0,
-				cornerRadius = 12,
+				borderThickness = if props.isHeld then 3.0 else 2.2,
+				cornerRadius = 14,
 				children = {
-					Shine = UIBuilder.ShineOverlay(12, 0.35, 0.85, 2, rarityColor),
+					Shine = UIBuilder.ShineOverlay(14, 0.35, 0.85, 2, rarityColor),
 					Content = React.createElement("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 4 }, {
 						Icon = React.createElement("ImageLabel", {
 							AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-							Size = UDim2.fromScale(0.68, 0.68), BackgroundTransparency = 1,
+							Size = UDim2.fromScale(0.70, 0.70), BackgroundTransparency = 1,
 							Image = item.icon, ScaleType = Enum.ScaleType.Fit, ZIndex = 5,
 						}),
 					}),
@@ -66,9 +66,9 @@ local function HotbarItemSlot(props: Props): any
 
 			KeybindBadge = if props.keybind then React.createElement("Frame", {
 				AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0, -2, 0, -4),
-				Size = UDim2.fromOffset(18, 18), BackgroundColor3 = Color3.fromRGB(35, 40, 52), ZIndex = 10,
+				Size = UDim2.fromOffset(22, 22), BackgroundColor3 = Color3.fromRGB(35, 40, 52), ZIndex = 10,
 			}, {
-				Corner = UIBuilder.Corner(5), Stroke = UIBuilder.Stroke(Color3.fromRGB(80, 90, 110), 1.2),
+				Corner = UIBuilder.Corner(6), Stroke = UIBuilder.Stroke(Color3.fromRGB(80, 90, 110), 1.2),
 				Text = React.createElement("TextLabel", {
 					Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = props.keybind,
 					TextColor3 = Color3.fromRGB(240, 245, 255), TextScaled = true, Font = Enum.Font.FredokaOne, ZIndex = 11,
@@ -77,11 +77,11 @@ local function HotbarItemSlot(props: Props): any
 
 			CloseBtn = if props.isHeld then React.createElement("TextButton", {
 				AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 4, 0, -4),
-				Size = UDim2.fromOffset(18, 18), BackgroundColor3 = Color3.fromRGB(231, 76, 60),
+				Size = UDim2.fromOffset(22, 22), BackgroundColor3 = Color3.fromRGB(231, 76, 60),
 				Text = "✕", TextColor3 = Color3.fromRGB(255, 255, 255), Font = Enum.Font.FredokaOne,
-				TextSize = 11, ZIndex = 12,
+				TextSize = 13, ZIndex = 12,
 				[React.Event.Activated] = function() props.onRemove() end,
-			}, { Corner = UIBuilder.Corner(9), Stroke = UIBuilder.Stroke(Color3.fromRGB(150, 40, 30), 1.2) }) else nil,
+			}, { Corner = UIBuilder.Corner(11), Stroke = UIBuilder.Stroke(Color3.fromRGB(150, 40, 30), 1.2) }) else nil,
 		}),
 	})
 end

@@ -28,8 +28,12 @@ local function Hotbar(props: Props): any
 	local isMobile = useDeviceType().isMobile
 	local items = props.equippedItems or {}
 	local totalButtons = 3 + #items
-	local baseWidth = if isMobile then math.clamp(0.12 * totalButtons + 0.1, 0.45, 0.95) else math.clamp(0.08 * totalButtons + 0.08, 0.35, 0.65)
-	local minWidth = if isMobile then 70 * totalButtons + 20 else 80 * totalButtons + 20
+	local baseWidth = if isMobile
+		then math.clamp((0.12 * totalButtons + 0.10) * 1.30, 0.55, 0.98)
+		else math.clamp((0.08 * totalButtons + 0.08) * 1.30, 0.45, 0.85)
+	local minWidth = if isMobile
+		then math.round((70 * totalButtons + 20) * 1.30)
+		else math.round((80 * totalButtons + 20) * 1.30)
 
 	local handleEquip = props.onEquipShovel or function() ToolToggleHelper.Toggle(nil) end
 	local handleSelect = props.onSelectShovel or function() end
@@ -73,21 +77,21 @@ local function Hotbar(props: Props): any
 
 	return React.createElement("Frame", {
 		AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromScale(0.5, 0.985),
-		Size = if isMobile then UDim2.fromScale(baseWidth, 0.11) else UDim2.fromScale(baseWidth, 0.085),
+		Size = if isMobile then UDim2.fromScale(baseWidth, 0.14) else UDim2.fromScale(baseWidth, 0.11),
 		BackgroundColor3 = Color3.fromRGB(18, 22, 30), BackgroundTransparency = 1, ZIndex = 10,
 	}, {
 		Corner = UIBuilder.PillCorner(),
 		Pad = React.createElement("UIPadding", {
-			PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6),
-			PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5),
+			PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8),
+			PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6),
 		}),
 		Layout = React.createElement("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 		SizeConstraint = React.createElement("UISizeConstraint", {
-			MinSize = Vector2.new(minWidth, if isMobile then 62 else 56),
-			MaxSize = Vector2.new(minWidth + 80, if isMobile then 80 else 72),
+			MinSize = Vector2.new(minWidth, if isMobile then 80 else 73),
+			MaxSize = Vector2.new(minWidth + 104, if isMobile then 104 else 94),
 		}),
 		ShovelBtn = React.createElement(HotbarButton, {
 			layoutOrder = 1, icon = HotbarTheme.Shovel.icon, label = "Equip",

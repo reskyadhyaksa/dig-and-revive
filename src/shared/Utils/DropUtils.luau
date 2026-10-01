@@ -57,4 +57,20 @@ function DropUtils.RollDrop(islandId: string, totalLuckMultiplier: number): Drop
 	return sortedDrops[#sortedDrops]
 end
 
+function DropUtils.GetDropByTier(islandId: string?, tier: string?): DropItem?
+	if not tier then return nil end
+	local dropList = if islandId then DropConfig[islandId] else nil
+	if dropList then
+		for _, drop in ipairs(dropList) do
+			if drop.tier == tier then return drop end
+		end
+	end
+	for _, drops in pairs(DropConfig) do
+		for _, drop in ipairs(drops) do
+			if drop.tier == tier then return drop end
+		end
+	end
+	return nil
+end
+
 return table.freeze(DropUtils)

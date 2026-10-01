@@ -16,84 +16,88 @@ local ZoneService = require(script.Parent:WaitForChild("ZoneService"))
 local PlayerService = require(script.Parent:WaitForChild("PlayerService"))
 local IndexService = require(script.Parent:WaitForChild("IndexService"))
 local InventoryRepository = require(script.Parent.Parent:WaitForChild("Repositories"):WaitForChild("InventoryRepository"))
+local DigSessionHelper = require(script.Parent.Parent:WaitForChild("Common"):WaitForChild("DigSessionHelper"))
 
 type DropItem = DropTypes.DropItem
-type DigSession = {
-	player: Player, islandId: string, power: number, drop: DropItem,
-	currentHp: number, maxHp: number, expireTime: number, lastSwingTime: number, digDamage: number,
-}
 
 local DigService = {}
 local _trove = Trove.new()
 local _playerLastDigEndTime: { [Player]: number } = {}
-local _activeSessions: { [Player]: DigSession } = {}
+local _forcedNextTier: { [Player]: string } = {}
 
 local function SendFail(p: Player, msg: string)
 	DigNetwork.MinigameComplete.fire(p, false, nil, 0, 0, PlayerService.GetPlayerLevel(p), PlayerService.GetPlayerExp(p), msg)
 end
 
+function DigService.SetForcedNextTier(p: Player, tier: string?)
+	_forcedNextTier[p] = tier
+end
+
+function DigService.GetForcedNextTier(p: Player): string?
+	return _forcedNextTier[p]
+end
+
 function DigService.Init()
 	_trove:Connect(Players.PlayerRemoving, function(p)
 		_playerLastDigEndTime[p] = nil
-		_activeSessions[p] = nil
+		_forcedNextTier[p] = nil
+		DigSessionHelper.Remove(p)
 	end)
 
 	_trove:Add(DigNetwork.StartDigRequest.on(function(p: Player, power: number, islandId: string)
 		local char = p.Character
 		if not char or not char:FindFirstChildOfClass("Humanoid") then return end
+		local forcedTier = _forcedNextTier[p]
+		if forcedTier then _forcedNextTier[p] = nil end
+
 		local tool = char:FindFirstChildWhichIsA("Tool")
 		local shovelCfg = if tool then ShovelUtils.GetShovelConfig(ShovelUtils.ResolveToolShovelId(tool:GetAttribute("ShovelId"), tool.Name)) else nil
-		if not shovelCfg then SendFail(p, "No valid shovel equipped!") return end
+		if not shovelCfg and not forcedTier then
+			SendFail(p, "No valid shovel equipped!")
+			return
+		end
 
 		local now = os.clock()
-		if now - (_playerLastDigEndTime[p] or 0) < shovelCfg.cooldown then
-			SendFail(p, "Please wait before digging again!") return
+		if not forcedTier and shovelCfg and (now - (_playerLastDigEndTime[p] or 0) < shovelCfg.cooldown) then
+			SendFail(p, "Please wait before digging again!")
+			return
 		end
 
 		local zone = ZoneService.GetPlayerCurrentZone(p)
-		if not zone or zone.islandId ~= islandId then SendFail(p, "Invalid zone!") return end
+		local targetIslandId: string = if zone then zone.islandId else islandId
+		local drop: DropItem? = if typeof(forcedTier) == "string" then DropUtils.GetDropByTier(targetIslandId, forcedTier)
+			else DropUtils.RollDrop(targetIslandId, PowerBarHelper.GetMultiplier(math.clamp(power or 0, 0, 1)) * PlayerService.GetTotalPlayerLuck(p))
+		if not drop then
+			_playerLastDigEndTime[p] = now
+			SendFail(p, "No item found.")
+			return
+		end
 
-		local powerMult = PowerBarHelper.GetMultiplier(math.clamp(power or 0, 0, 1))
-		local totalLuck = powerMult * PlayerService.GetTotalPlayerLuck(p)
-		local drop = DropUtils.RollDrop(zone.islandId, totalLuck)
-		if not drop then _playerLastDigEndTime[p] = now SendFail(p, "No item found.") return end
-
-		local baseHp = DigMinigameConfig.TierHp[drop.tier] or 12
-		local damage = math.max(1, math.floor(shovelCfg.digPower / 10))
-		_activeSessions[p] = {
-			player = p, islandId = islandId, power = power, drop = drop,
-			currentHp = baseHp, maxHp = baseHp, expireTime = now + DigMinigameConfig.Duration,
-			lastSwingTime = 0, digDamage = damage,
-		}
-		DigNetwork.StartMinigame.fire(p, drop.tier, baseHp, DigMinigameConfig.Duration)
+		local validDrop: DropItem = drop
+		local duration = if forcedTier then 60.0 else DigMinigameConfig.Duration
+		local damage = if forcedTier then 999 else math.max(1, math.floor((if shovelCfg then shovelCfg.digPower else 100) / 10))
+		local session = DigSessionHelper.Create(p, targetIslandId, power, validDrop, duration, damage)
+		DigNetwork.StartMinigame.fire(p, tostring(validDrop.tier), session.maxHp, duration)
 	end))
 
 	_trove:Add(DigNetwork.SwingRequest.on(function(p: Player)
-		local s = _activeSessions[p]
+		local s = DigSessionHelper.Get(p)
 		if not s then return end
 		local now = os.clock()
 		if now > s.expireTime then
-			_activeSessions[p] = nil _playerLastDigEndTime[p] = now
-			SendFail(p, "Minigame time expired!") return
+			DigSessionHelper.Remove(p)
+			_playerLastDigEndTime[p] = now
+			SendFail(p, "Minigame time expired!")
+			return
 		end
 
-		if now - s.lastSwingTime < DigMinigameConfig.SwingCooldown then return end
-		s.lastSwingTime = now
-		s.currentHp = math.max(0, s.currentHp - s.digDamage)
-
-		-- Random Soil Resistance Surge / Regen Event
-		if s.currentHp > 0 and s.currentHp >= DigMinigameConfig.RegenEvent.thresholdMinHp and s.currentHp < s.maxHp then
-			if math.random() < DigMinigameConfig.RegenEvent.chance then
-				local regen = math.random(DigMinigameConfig.RegenEvent.minAmount, DigMinigameConfig.RegenEvent.maxAmount)
-				s.currentHp = math.min(s.maxHp, s.currentHp + regen)
-			end
-		end
+		local swung, isComplete = DigSessionHelper.ProcessSwing(s, now)
+		if not swung then return end
 
 		DigNetwork.MinigameHit.fire(p, s.currentHp, s.maxHp)
-
-		if s.currentHp <= 0 then
+		if isComplete then
 			local won = s.drop
-			_activeSessions[p] = nil
+			DigSessionHelper.Remove(p)
 			_playerLastDigEndTime[p] = now
 			InventoryRepository.AddItem(p, won, 1)
 			IndexService.RecordDiscovery(p, won.id)
@@ -107,7 +111,8 @@ end
 function DigService.Destroy()
 	_trove:Clean()
 	table.clear(_playerLastDigEndTime)
-	table.clear(_activeSessions)
+	table.clear(_forcedNextTier)
+	DigSessionHelper.Clear()
 end
 
 return DigService

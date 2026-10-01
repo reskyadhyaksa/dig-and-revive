@@ -5,8 +5,10 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local Trove = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Trove"))
-
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local DropUtils = require(Shared:WaitForChild("Utils"):WaitForChild("DropUtils"))
 local DigNetwork = require(script.Parent.Parent:WaitForChild("Network"):WaitForChild("DigNetwork"))
+local SecretVFXController = require(script.Parent:WaitForChild("SecretVFXController"))
 
 local DropVFXController = {}
 local _trove = Trove.new()
@@ -99,7 +101,13 @@ end
 
 function DropVFXController.Init()
 	_trove:Add(DigNetwork.DigDropVFX.on(function(p, dropId)
-		if p and dropId then DropVFXController.PlaySurfaceRiseDrop(p, dropId) end
+		if p and dropId then
+			DropVFXController.PlaySurfaceRiseDrop(p, dropId)
+			local drop = DropUtils.GetDropItem(dropId)
+			if drop and drop.tier == "Secret" then
+				SecretVFXController.PlaySecretDropVFX(p)
+			end
+		end
 	end))
 end
 
